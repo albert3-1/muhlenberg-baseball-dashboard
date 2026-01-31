@@ -1,0 +1,1063 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Centennial Conference Baseball Scouting Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { margin: 0; padding: 0; background-color: #111827; font-family: system-ui, -apple-system, sans-serif; }
+    .animate-spin { animation: spin 1s linear infinite; }
+    @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <script type="text/babel">
+    const { useState, useMemo } = React;
+
+    // ============================================================================
+    // ICONS (inline SVGs)
+    // ============================================================================
+    const Icon = ({ d, size = 20, className = "" }) => (
+      <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d={d}/></svg>
+    );
+    const TrendingUp = (p) => <Icon {...p} d="M22 7 13.5 15.5 8.5 10.5 2 17M16 7h6v6" />;
+    const Target = (p) => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={p.className}><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>;
+    const Users = (p) => <Icon {...p} d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />;
+    const Zap = (p) => <Icon {...p} d="M13 2 3 14h9l-1 8 10-12h-9l1-8" />;
+    const AlertTriangle = (p) => <Icon {...p} d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3ZM12 9v4M12 17h.01" />;
+    const X = (p) => <Icon {...p} d="M18 6 6 18M6 6l12 12" />;
+    const ChevronDown = (p) => <Icon {...p} d="m6 9 6 6 6-6" size={16} />;
+    const Key = (p) => <Icon {...p} d="m21 2-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0 3 3L22 7l-3-3m-3.5 3.5L19 4" size={16} />;
+    const Eye = (p) => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={p.className}><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>;
+    const EyeOff = (p) => <Icon {...p} d="M9.88 9.88a3 3 0 1 0 4.24 4.24M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61M2 2l20 20" size={16} />;
+    const Loader = (p) => <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={p.className}><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>;
+    const Database = (p) => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={p.className}><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5V19a9 3 0 0 0 18 0V5"/><path d="M3 12a9 3 0 0 0 18 0"/></svg>;
+
+    // Info tooltip component for explaining qualification criteria
+    function InfoTooltip({ text }) {
+      return (
+        <span className="relative group cursor-help ml-2">
+          <svg className="w-4 h-4 text-gray-400 inline" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+          </svg>
+          <span className="invisible group-hover:visible absolute left-1/2 -translate-x-1/2 bottom-full mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg whitespace-nowrap z-50 shadow-lg border border-gray-700">
+            {text}
+          </span>
+        </span>
+      );
+    }
+
+    // Threshold constants for qualified players
+    const MIN_AB = 30;  // Minimum at-bats for batters
+    const MIN_IP = 10;  // Minimum innings pitched for pitchers
+
+    // ============================================================================
+    // DATA
+    // ============================================================================
+    const TEAMS = {
+      muh: { code: 'muh', name: 'Muhlenberg', mascot: 'Mules', color: '#991B1B', isHome: true },
+      jhu: { code: 'jhu', name: 'Johns Hopkins', mascot: 'Blue Jays', color: '#1E3A8A' },
+      get: { code: 'get', name: 'Gettysburg', mascot: 'Bullets', color: '#EA580C' },
+      hav: { code: 'hav', name: 'Haverford', mascot: 'Fords', color: '#991B1B' },
+      mcd: { code: 'mcd', name: 'McDaniel', mascot: 'Green Terror', color: '#166534' },
+      wac: { code: 'wac', name: 'Washington College', mascot: 'Shoremen', color: '#7F1D1D' },
+      fandm: { code: 'fandm', name: 'Franklin & Marshall', mascot: 'Diplomats', color: '#1E3A8A' },
+      swa: { code: 'swa', name: 'Swarthmore', mascot: 'Garnet', color: '#7F1D1D' },
+      urs: { code: 'urs', name: 'Ursinus', mascot: 'Bears', color: '#B91C1C' },
+      dick: { code: 'dick', name: 'Dickinson', mascot: 'Red Devils', color: '#B91C1C' }
+    };
+
+    const STATS = {
+      muh: { batting: { avg: .298, obp: .420, slg: .426, g: 39, r: 293, hr: 23, sb: 64, rbi: 247 }, pitching: { era: 7.56, wins: 19, losses: 20, so: 224, bb: 160, whip: 1.82, fldPct: .950 } },
+      jhu: { batting: { avg: .338, obp: .426, slg: .609, g: 49, r: 490, hr: 110, sb: 52, rbi: 458 }, pitching: { era: 3.72, wins: 44, losses: 5, so: 387, bb: 155, whip: 1.27, fldPct: .968 } },
+      get: { batting: { avg: .330, obp: .452, slg: .460, g: 41, r: 391, hr: 25, sb: 73, rbi: 342 }, pitching: { era: 4.94, wins: 30, losses: 11, so: 280, bb: 136, whip: 1.37, fldPct: .961 } },
+      hav: { batting: { avg: .327, obp: .443, slg: .544, g: 40, r: 403, hr: 63, sb: 127, rbi: 360 }, pitching: { era: 7.78, wins: 24, losses: 16, so: 323, bb: 205, whip: 1.80, fldPct: .952 } },
+      mcd: { batting: { avg: .318, obp: .415, slg: .459, g: 42, r: 343, hr: 23, sb: 59, rbi: 308 }, pitching: { era: 7.07, wins: 19, losses: 22, so: 253, bb: 236, whip: 1.89, fldPct: .954 } },
+      wac: { batting: { avg: .315, obp: .401, slg: .484, g: 40, r: 318, hr: 39, sb: 93, rbi: 279 }, pitching: { era: 7.36, wins: 19, losses: 21, so: 234, bb: 194, whip: 1.88, fldPct: .956 } },
+      fandm: { batting: { avg: .303, obp: .408, slg: .423, g: 40, r: 289, hr: 17, sb: 71, rbi: 262 }, pitching: { era: 5.73, wins: 21, losses: 19, so: 285, bb: 201, whip: 1.66, fldPct: .953 } },
+      swa: { batting: { avg: .299, obp: .418, slg: .447, g: 42, r: 362, hr: 42, sb: 101, rbi: 309 }, pitching: { era: 6.79, wins: 24, losses: 18, so: 269, bb: 205, whip: 1.81, fldPct: .960 } },
+      urs: { batting: { avg: .277, obp: .403, slg: .360, g: 40, r: 278, hr: 11, sb: 100, rbi: 243 }, pitching: { era: 5.01, wins: 20, losses: 20, so: 239, bb: 151, whip: 1.53, fldPct: .966 } },
+      dick: { batting: { avg: .272, obp: .391, slg: .367, g: 35, r: 211, hr: 10, sb: 65, rbi: 182 }, pitching: { era: 5.79, wins: 16, losses: 19, so: 253, bb: 130, whip: 1.56, fldPct: .940 } }
+    };
+
+    // VERIFIED DATA - Scraped from official team athletics websites on 2026-01-31
+    // Source: Each team's Sidearm Sports stats page (e.g., muhlenbergsports.com/sports/baseball/stats/2025)
+    // Data is 2025 season statistics - now includes all qualified players (30+ AB / 10+ IP) with comprehensive stats
+    const PLAYERS = {
+      muh: {
+        batters: [
+          { name: 'Quarrie, Marc', gp: 39, ab: 151, avg: 0.404, h: 61, doubles: 13, triples: 3, hr: 11, rbi: 49, r: 62, bb: 29, so: 33, sb: 17, ops: 1.264 },
+          { name: 'Bussiere, Brendan', gp: 38, ab: 130, avg: 0.354, h: 46, doubles: 10, triples: 4, hr: 1, rbi: 16, r: 27, bb: 24, so: 21, sb: 14, ops: 1.024 },
+          { name: 'Kent, Jack', gp: 39, ab: 148, avg: 0.351, h: 52, doubles: 14, triples: 1, hr: 4, rbi: 34, r: 39, bb: 23, so: 26, sb: 17, ops: 1.02 },
+          { name: 'Hughes, Brendan', gp: 39, ab: 161, avg: 0.329, h: 53, doubles: 18, triples: 2, hr: 3, rbi: 39, r: 17, bb: 12, so: 23, sb: 2, ops: 0.903 },
+          { name: 'Legner, Aidan', gp: 38, ab: 131, avg: 0.321, h: 42, doubles: 7, triples: 0, hr: 0, rbi: 13, r: 35, bb: 15, so: 20, sb: 3, ops: 0.79 },
+          { name: 'Pranzo, Thomas', gp: 29, ab: 91, avg: 0.319, h: 29, doubles: 5, triples: 0, hr: 3, rbi: 27, r: 15, bb: 25, so: 21, sb: 0, ops: 0.944 },
+          { name: 'Hobson, Spencer', gp: 34, ab: 120, avg: 0.275, h: 33, doubles: 3, triples: 1, hr: 0, rbi: 19, r: 24, bb: 14, so: 14, sb: 1, ops: 0.717 },
+          { name: 'Cifalino, Salvatore', gp: 15, ab: 47, avg: 0.255, h: 12, doubles: 2, triples: 0, hr: 1, rbi: 7, r: 7, bb: 3, so: 14, sb: 0, ops: 0.702 },
+          { name: 'Habeeb, Sean', gp: 31, ab: 95, avg: 0.253, h: 24, doubles: 2, triples: 1, hr: 0, rbi: 7, r: 22, bb: 12, so: 13, sb: 7, ops: 0.644 },
+          { name: 'Mehling, Mason', gp: 22, ab: 58, avg: 0.172, h: 10, doubles: 1, triples: 0, hr: 0, rbi: 7, r: 9, bb: 12, so: 20, sb: 1, ops: 0.537 },
+          { name: 'Dimovski, Steven', gp: 11, ab: 35, avg: 0.143, h: 5, doubles: 2, triples: 0, hr: 0, rbi: 5, r: 6, bb: 5, so: 10, sb: 0, ops: 0.468 }
+        ],
+        pitchers: [
+          { name: 'Siper, Charlie', app: 17, gs: 0, era: 4.03, w: 4, l: 0, sv: 0, ip: 29.0, h: 29, r: 15, er: 13, bb: 12, so: 20, whip: 1.41 },
+          { name: 'Hughes, Brendan', app: 10, gs: 10, era: 4.22, w: 3, l: 1, sv: 0, ip: 49.0, h: 57, r: 29, er: 23, bb: 15, so: 35, whip: 1.47 },
+          { name: 'Ohl, Shane', app: 9, gs: 4, era: 4.55, w: 3, l: 2, sv: 0, ip: 27.2, h: 34, r: 21, er: 14, bb: 4, so: 11, whip: 1.37 },
+          { name: 'Brochin, Ethan', app: 19, gs: 1, era: 5.09, w: 3, l: 2, sv: 3, ip: 35.1, h: 46, r: 22, er: 20, bb: 12, so: 27, whip: 1.64 },
+          { name: 'Mulholland, Kieran', app: 11, gs: 6, era: 5.53, w: 2, l: 2, sv: 1, ip: 40.2, h: 47, r: 29, er: 25, bb: 15, so: 25, whip: 1.52 },
+          { name: 'Foley, Luke', app: 11, gs: 11, era: 9.12, w: 1, l: 6, sv: 0, ip: 48.1, h: 70, r: 63, er: 49, bb: 26, so: 40, whip: 1.99 },
+          { name: 'Virno, Evan', app: 12, gs: 0, era: 9.74, w: 0, l: 1, sv: 0, ip: 20.1, h: 29, r: 24, er: 22, bb: 5, so: 9, whip: 1.67 },
+          { name: 'Oehrlein, Matt', app: 6, gs: 4, era: 10.05, w: 1, l: 2, sv: 0, ip: 14.1, h: 19, r: 18, er: 16, bb: 8, so: 15, whip: 1.88 },
+          { name: 'ODonnell, Dylan', app: 13, gs: 0, era: 12.19, w: 1, l: 1, sv: 0, ip: 10.1, h: 10, r: 15, er: 14, bb: 16, so: 4, whip: 2.52 },
+          { name: 'Kern, Frank', app: 13, gs: 2, era: 13.28, w: 0, l: 2, sv: 0, ip: 20.1, h: 44, r: 34, er: 30, bb: 10, so: 19, whip: 2.66 }
+        ]
+      },
+      jhu: {
+        batters: [
+          { name: 'Souvignier, Dillon', gp: 49, ab: 190, avg: 0.421, h: 80, doubles: 11, triples: 3, hr: 16, rbi: 62, r: 60, bb: 23, so: 16, sb: 13, ops: 1.252 },
+          { name: 'Stevens, Jimmy', gp: 49, ab: 184, avg: 0.375, h: 69, doubles: 14, triples: 2, hr: 20, rbi: 68, r: 56, bb: 19, so: 36, sb: 10, ops: 1.243 },
+          { name: 'Steuerer, Shawn', gp: 48, ab: 198, avg: 0.369, h: 73, doubles: 17, triples: 0, hr: 17, rbi: 56, r: 66, bb: 18, so: 24, sb: 8, ops: 1.139 },
+          { name: 'Harris, Jacob', gp: 48, ab: 179, avg: 0.341, h: 61, doubles: 11, triples: 3, hr: 9, rbi: 50, r: 45, bb: 17, so: 15, sb: 1, ops: 1.005 },
+          { name: 'Geer, Lukas', gp: 30, ab: 82, avg: 0.341, h: 28, doubles: 8, triples: 1, hr: 4, rbi: 27, r: 16, bb: 9, so: 20, sb: 1, ops: 1.023 },
+          { name: 'Cyr, Caleb', gp: 45, ab: 169, avg: 0.337, h: 57, doubles: 12, triples: 0, hr: 12, rbi: 44, r: 55, bb: 29, so: 31, sb: 2, ops: 1.069 },
+          { name: 'Brown, Damian', gp: 21, ab: 36, avg: 0.333, h: 12, doubles: 4, triples: 0, hr: 1, rbi: 5, r: 6, bb: 3, so: 9, sb: 0, ops: 0.918 },
+          { name: 'Shane, Alex', gp: 48, ab: 187, avg: 0.332, h: 62, doubles: 18, triples: 0, hr: 11, rbi: 41, r: 58, bb: 34, so: 39, sb: 3, ops: 1.054 },
+          { name: 'Siani, Jake', gp: 48, ab: 154, avg: 0.312, h: 48, doubles: 5, triples: 4, hr: 6, rbi: 32, r: 42, bb: 24, so: 26, sb: 8, ops: 0.947 },
+          { name: 'Hartje, Clay', gp: 39, ab: 109, avg: 0.312, h: 34, doubles: 6, triples: 0, hr: 7, rbi: 37, r: 30, bb: 20, so: 19, sb: 0, ops: 0.978 },
+          { name: 'Whitney, Dylan', gp: 46, ab: 170, avg: 0.288, h: 49, doubles: 5, triples: 3, hr: 6, rbi: 31, r: 46, bb: 27, so: 23, sb: 6, ops: 0.846 }
+        ],
+        pitchers: [
+          { name: 'Meert, Grant', app: 18, gs: 0, era: 1.19, w: 1, l: 0, sv: 6, ip: 22.2, h: 17, r: 5, er: 3, bb: 7, so: 42, whip: 1.06 },
+          { name: 'Grumbles, Drew', app: 15, gs: 12, era: 1.75, w: 8, l: 0, sv: 0, ip: 67.0, h: 49, r: 21, er: 13, bb: 24, so: 73, whip: 1.09 },
+          { name: 'Jos, Nicolas', app: 10, gs: 0, era: 2.31, w: 0, l: 0, sv: 0, ip: 11.2, h: 13, r: 6, er: 3, bb: 5, so: 12, whip: 1.54 },
+          { name: 'Cancian, Thomas', app: 15, gs: 0, era: 2.5, w: 1, l: 1, sv: 0, ip: 18.0, h: 11, r: 5, er: 5, bb: 4, so: 14, whip: 0.83 },
+          { name: 'Anderson, Ryan', app: 16, gs: 0, era: 3.04, w: 5, l: 1, sv: 0, ip: 23.2, h: 16, r: 10, er: 8, bb: 10, so: 26, whip: 1.1 },
+          { name: 'Collins, Kieren', app: 14, gs: 14, era: 3.38, w: 9, l: 2, sv: 0, ip: 88.0, h: 80, r: 40, er: 33, bb: 21, so: 60, whip: 1.15 },
+          { name: 'Sugrim, Tyler', app: 16, gs: 0, era: 3.92, w: 1, l: 0, sv: 1, ip: 20.2, h: 23, r: 10, er: 9, bb: 7, so: 15, whip: 1.45 },
+          { name: 'Boneno, William', app: 19, gs: 0, era: 3.95, w: 4, l: 0, sv: 2, ip: 27.1, h: 19, r: 15, er: 12, bb: 17, so: 32, whip: 1.32 },
+          { name: 'Jefferson, Cole', app: 13, gs: 0, era: 4.66, w: 5, l: 0, sv: 0, ip: 19.1, h: 13, r: 10, er: 10, bb: 9, so: 16, whip: 1.14 },
+          { name: 'Rovner, Quinn', app: 13, gs: 13, era: 5.43, w: 7, l: 1, sv: 0, ip: 59.2, h: 65, r: 41, er: 36, bb: 20, so: 34, whip: 1.42 },
+          { name: 'Monterrosa, Charles', app: 8, gs: 6, era: 6.0, w: 2, l: 0, sv: 1, ip: 33.0, h: 34, r: 25, er: 22, bb: 6, so: 30, whip: 1.21 }
+        ]
+      },
+      get: {
+        batters: [
+          { name: 'Murphy, Robert', gp: 41, ab: 121, avg: 0.397, h: 48, doubles: 5, triples: 0, hr: 0, rbi: 24, r: 45, bb: 38, so: 13, sb: 2, ops: 0.999 },
+          { name: 'Balsamo, Dominick', gp: 27, ab: 61, avg: 0.393, h: 24, doubles: 5, triples: 1, hr: 2, rbi: 22, r: 15, bb: 17, so: 13, sb: 0, ops: 1.131 },
+          { name: 'Burke, Jack', gp: 41, ab: 173, avg: 0.382, h: 66, doubles: 20, triples: 1, hr: 7, rbi: 43, r: 65, bb: 15, so: 14, sb: 20, ops: 1.095 },
+          { name: 'Pistner, Jack', gp: 41, ab: 165, avg: 0.37, h: 61, doubles: 9, triples: 5, hr: 9, rbi: 66, r: 45, bb: 35, so: 22, sb: 5, ops: 1.126 },
+          { name: 'Amirata, Jack', gp: 34, ab: 102, avg: 0.353, h: 36, doubles: 6, triples: 0, hr: 2, rbi: 20, r: 23, bb: 19, so: 13, sb: 4, ops: 0.943 },
+          { name: 'Stellato, Will', gp: 41, ab: 174, avg: 0.333, h: 58, doubles: 12, triples: 1, hr: 0, rbi: 44, r: 32, bb: 14, so: 22, sb: 11, ops: 0.812 },
+          { name: 'Andersen, Brian', gp: 20, ab: 34, avg: 0.324, h: 11, doubles: 3, triples: 0, hr: 0, rbi: 3, r: 12, bb: 6, so: 9, sb: 0, ops: 0.864 },
+          { name: 'Hicks, Adam', gp: 32, ab: 70, avg: 0.314, h: 22, doubles: 1, triples: 0, hr: 0, rbi: 14, r: 22, bb: 12, so: 4, sb: 2, ops: 0.777 },
+          { name: 'Nichols, Matt', gp: 40, ab: 115, avg: 0.304, h: 35, doubles: 3, triples: 1, hr: 2, rbi: 27, r: 24, bb: 21, so: 36, sb: 7, ops: 0.81 },
+          { name: 'Roche, Will', gp: 30, ab: 70, avg: 0.286, h: 20, doubles: 3, triples: 1, hr: 0, rbi: 13, r: 19, bb: 18, so: 8, sb: 2, ops: 0.819 },
+          { name: 'Stout, Alexey', gp: 19, ab: 34, avg: 0.265, h: 9, doubles: 0, triples: 1, hr: 0, rbi: 2, r: 6, bb: 5, so: 12, sb: 2, ops: 0.683 },
+          { name: 'Vivona, Matthew', gp: 14, ab: 34, avg: 0.265, h: 9, doubles: 3, triples: 0, hr: 0, rbi: 4, r: 6, bb: 8, so: 8, sb: 2, ops: 0.758 },
+          { name: 'Fischetti, Michael', gp: 31, ab: 58, avg: 0.224, h: 13, doubles: 4, triples: 0, hr: 1, rbi: 16, r: 9, bb: 15, so: 18, sb: 1, ops: 0.758 },
+          { name: 'Laqui, Brendan', gp: 34, ab: 77, avg: 0.182, h: 14, doubles: 5, triples: 0, hr: 1, rbi: 20, r: 19, bb: 15, so: 24, sb: 6, ops: 0.671 }
+        ],
+        pitchers: [
+          { name: 'Wootten, Ryan', app: 6, gs: 2, era: 0.56, w: 3, l: 0, sv: 0, ip: 16.0, h: 11, r: 6, er: 1, bb: 4, so: 9, whip: 0.94 },
+          { name: 'Wilkie-Viscio, Alex', app: 11, gs: 11, era: 3.36, w: 5, l: 1, sv: 0, ip: 61.2, h: 73, r: 32, er: 23, bb: 6, so: 39, whip: 1.28 },
+          { name: 'Klein, Zach', app: 15, gs: 0, era: 3.42, w: 3, l: 0, sv: 1, ip: 26.1, h: 32, r: 13, er: 10, bb: 8, so: 14, whip: 1.52 },
+          { name: 'Francesconi, John', app: 13, gs: 4, era: 3.86, w: 6, l: 0, sv: 0, ip: 44.1, h: 43, r: 22, er: 19, bb: 17, so: 37, whip: 1.35 },
+          { name: 'Lizell, Tyler', app: 20, gs: 0, era: 4.45, w: 4, l: 4, sv: 6, ip: 32.1, h: 35, r: 20, er: 16, bb: 8, so: 27, whip: 1.33 },
+          { name: 'Weedon, James', app: 12, gs: 10, era: 4.96, w: 3, l: 1, sv: 0, ip: 49.0, h: 44, r: 28, er: 27, bb: 26, so: 52, whip: 1.43 },
+          { name: 'Bergen, Alex', app: 9, gs: 0, era: 6.38, w: 1, l: 2, sv: 1, ip: 18.1, h: 21, r: 13, er: 13, bb: 10, so: 18, whip: 1.69 },
+          { name: 'Mitnick, Ethan', app: 13, gs: 2, era: 7.02, w: 1, l: 1, sv: 1, ip: 16.2, h: 18, r: 13, er: 13, bb: 12, so: 15, whip: 1.8 },
+          { name: 'Trotta, Brendan', app: 11, gs: 9, era: 8.03, w: 2, l: 2, sv: 1, ip: 37.0, h: 56, r: 39, er: 33, bb: 17, so: 26, whip: 1.97 },
+          { name: 'Rossi, Jack', app: 7, gs: 3, era: 9.77, w: 0, l: 0, sv: 0, ip: 15.2, h: 26, r: 17, er: 17, bb: 5, so: 21, whip: 1.98 }
+        ]
+      },
+      hav: {
+        batters: [
+          { name: 'Sgro, Jackson', gp: 30, ab: 113, avg: 0.442, h: 50, doubles: 11, triples: 0, hr: 11, rbi: 43, r: 30, bb: 13, so: 15, sb: 3, ops: 1.336 },
+          { name: 'Genth, Harry', gp: 39, ab: 145, avg: 0.428, h: 62, doubles: 15, triples: 2, hr: 23, rbi: 77, r: 69, bb: 25, so: 18, sb: 31, ops: 1.59 },
+          { name: 'Wallis, Jack', gp: 40, ab: 161, avg: 0.385, h: 62, doubles: 14, triples: 0, hr: 5, rbi: 50, r: 50, bb: 16, so: 26, sb: 10, ops: 1.028 },
+          { name: 'Treese, Luke', gp: 38, ab: 128, avg: 0.336, h: 43, doubles: 9, triples: 1, hr: 3, rbi: 24, r: 28, bb: 22, so: 23, sb: 15, ops: 0.958 },
+          { name: 'Dahl, Matt', gp: 30, ab: 99, avg: 0.323, h: 32, doubles: 5, triples: 1, hr: 2, rbi: 26, r: 25, bb: 6, so: 21, sb: 6, ops: 0.831 },
+          { name: 'Runfola, Anthony', gp: 37, ab: 151, avg: 0.318, h: 48, doubles: 14, triples: 4, hr: 9, rbi: 45, r: 38, bb: 13, so: 35, sb: 8, ops: 1.044 },
+          { name: 'Norton, Chuck', gp: 40, ab: 155, avg: 0.316, h: 49, doubles: 8, triples: 0, hr: 2, rbi: 25, r: 30, bb: 10, so: 13, sb: 13, ops: 0.782 },
+          { name: 'Prusek, Miles', gp: 29, ab: 76, avg: 0.276, h: 21, doubles: 4, triples: 0, hr: 2, rbi: 19, r: 25, bb: 18, so: 23, sb: 4, ops: 0.849 },
+          { name: 'Rosman, Daniel', gp: 40, ab: 127, avg: 0.244, h: 31, doubles: 1, triples: 0, hr: 1, rbi: 15, r: 48, bb: 26, so: 44, sb: 13, ops: 0.721 },
+          { name: 'Flieder, Jonny', gp: 31, ab: 99, avg: 0.232, h: 23, doubles: 2, triples: 0, hr: 4, rbi: 21, r: 30, bb: 21, so: 17, sb: 12, ops: 0.768 },
+          { name: 'Curry II, Kendrick', gp: 24, ab: 62, avg: 0.226, h: 14, doubles: 4, triples: 1, hr: 0, rbi: 10, r: 11, bb: 12, so: 9, sb: 4, ops: 0.683 }
+        ],
+        pitchers: [
+          { name: 'Cohen, Sam', app: 12, gs: 8, era: 3.4, w: 5, l: 1, sv: 0, ip: 55.2, h: 50, r: 24, er: 21, bb: 19, so: 57, whip: 1.24 },
+          { name: 'Doyle, Drew', app: 14, gs: 0, era: 5.55, w: 4, l: 2, sv: 2, ip: 24.1, h: 23, r: 18, er: 15, bb: 12, so: 22, whip: 1.44 },
+          { name: 'Grohowski, Riley', app: 13, gs: 9, era: 6.63, w: 4, l: 2, sv: 2, ip: 55.2, h: 75, r: 46, er: 41, bb: 18, so: 36, whip: 1.67 },
+          { name: 'Jenkinson, Alex', app: 8, gs: 4, era: 6.92, w: 2, l: 0, sv: 0, ip: 26.0, h: 31, r: 28, er: 20, bb: 10, so: 20, whip: 1.58 },
+          { name: 'Bertz, David', app: 10, gs: 7, era: 7.57, w: 3, l: 3, sv: 0, ip: 35.2, h: 44, r: 38, er: 30, bb: 21, so: 45, whip: 1.82 },
+          { name: 'Mattison, Wyatt', app: 13, gs: 0, era: 8.55, w: 1, l: 0, sv: 0, ip: 20.0, h: 20, r: 20, er: 19, bb: 17, so: 17, whip: 1.85 },
+          { name: 'Couture, Jack', app: 10, gs: 8, era: 8.74, w: 0, l: 2, sv: 1, ip: 34.0, h: 52, r: 41, er: 33, bb: 18, so: 34, whip: 2.06 },
+          { name: 'Naegelen, Adam', app: 12, gs: 0, era: 9.92, w: 3, l: 1, sv: 0, ip: 16.1, h: 21, r: 23, er: 18, bb: 10, so: 19, whip: 1.9 },
+          { name: 'Goldstein, Ethan', app: 12, gs: 2, era: 9.98, w: 1, l: 2, sv: 0, ip: 15.1, h: 17, r: 21, er: 17, bb: 15, so: 16, whip: 2.09 },
+          { name: 'Lewis, Colin', app: 9, gs: 2, era: 10.13, w: 1, l: 2, sv: 0, ip: 21.1, h: 21, r: 31, er: 24, bb: 31, so: 32, whip: 2.44 },
+          { name: 'Ferguson, Thomas', app: 7, gs: 0, era: 10.8, w: 0, l: 0, sv: 0, ip: 10.0, h: 11, r: 13, er: 12, bb: 12, so: 10, whip: 2.3 }
+        ]
+      },
+      mcd: {
+        batters: [
+          { name: 'Davis, Ben', gp: 42, ab: 161, avg: 0.404, h: 65, doubles: 13, triples: 2, hr: 6, rbi: 52, r: 42, bb: 29, so: 24, sb: 3, ops: 1.126 },
+          { name: 'McKenna, Shea', gp: 41, ab: 163, avg: 0.368, h: 60, doubles: 10, triples: 4, hr: 2, rbi: 42, r: 41, bb: 23, so: 29, sb: 17, ops: 0.977 },
+          { name: 'Daly, Shane', gp: 31, ab: 111, avg: 0.36, h: 40, doubles: 13, triples: 3, hr: 3, rbi: 16, r: 35, bb: 7, so: 14, sb: 16, ops: 1.042 },
+          { name: 'Dean, Quinn', gp: 22, ab: 62, avg: 0.355, h: 22, doubles: 2, triples: 2, hr: 0, rbi: 13, r: 12, bb: 14, so: 10, sb: 0, ops: 0.94 },
+          { name: 'Haddock, Ethan', gp: 35, ab: 152, avg: 0.336, h: 51, doubles: 10, triples: 1, hr: 3, rbi: 28, r: 32, bb: 6, so: 9, sb: 4, ops: 0.841 },
+          { name: 'Hubinger, Joey', gp: 42, ab: 163, avg: 0.319, h: 52, doubles: 16, triples: 5, hr: 2, rbi: 31, r: 50, bb: 30, so: 47, sb: 3, ops: 0.948 },
+          { name: 'Kelly, Patrick', gp: 17, ab: 47, avg: 0.319, h: 15, doubles: 2, triples: 0, hr: 2, rbi: 6, r: 13, bb: 6, so: 10, sb: 0, ops: 0.928 },
+          { name: 'Fuller, Matt', gp: 28, ab: 100, avg: 0.31, h: 31, doubles: 6, triples: 1, hr: 0, rbi: 23, r: 15, bb: 7, so: 13, sb: 1, ops: 0.748 },
+          { name: 'Stolba, DJ', gp: 29, ab: 107, avg: 0.299, h: 32, doubles: 5, triples: 3, hr: 0, rbi: 28, r: 20, bb: 10, so: 25, sb: 1, ops: 0.817 },
+          { name: 'Mezzullo, Thomas', gp: 25, ab: 82, avg: 0.293, h: 24, doubles: 4, triples: 0, hr: 0, rbi: 14, r: 11, bb: 9, so: 17, sb: 2, ops: 0.706 },
+          { name: 'Mullins, Maximus', gp: 21, ab: 33, avg: 0.273, h: 9, doubles: 2, triples: 0, hr: 2, rbi: 7, r: 11, bb: 5, so: 11, sb: 0, ops: 0.972 },
+          { name: 'Cerone, Anthony', gp: 14, ab: 41, avg: 0.268, h: 11, doubles: 2, triples: 0, hr: 1, rbi: 4, r: 10, bb: 8, so: 6, sb: 0, ops: 0.79 },
+          { name: 'Simon, Cameron', gp: 13, ab: 42, avg: 0.262, h: 11, doubles: 2, triples: 1, hr: 1, rbi: 10, r: 10, bb: 5, so: 10, sb: 1, ops: 0.783 },
+          { name: 'Novario, Henry', gp: 26, ab: 82, avg: 0.256, h: 21, doubles: 4, triples: 1, hr: 0, rbi: 17, r: 15, bb: 8, so: 14, sb: 5, ops: 0.676 },
+          { name: 'Calhoun, Todd', gp: 17, ab: 51, avg: 0.235, h: 12, doubles: 1, triples: 0, hr: 0, rbi: 6, r: 17, bb: 9, so: 14, sb: 4, ops: 0.649 },
+          { name: 'Carl, Kyle', gp: 13, ab: 35, avg: 0.143, h: 5, doubles: 0, triples: 0, hr: 1, rbi: 5, r: 3, bb: 2, so: 11, sb: 2, ops: 0.44 }
+        ],
+        pitchers: [
+          { name: 'Speakman, Matt', app: 10, gs: 0, era: 2.53, w: 0, l: 0, sv: 0, ip: 10.2, h: 7, r: 3, er: 3, bb: 9, so: 12, whip: 1.5 },
+          { name: 'DiBlasi, Dominic', app: 16, gs: 0, era: 3.26, w: 2, l: 1, sv: 0, ip: 38.2, h: 51, r: 22, er: 14, bb: 14, so: 23, whip: 1.68 },
+          { name: 'Harach, Brady', app: 10, gs: 10, era: 3.86, w: 3, l: 1, sv: 0, ip: 25.2, h: 22, r: 12, er: 11, bb: 19, so: 24, whip: 1.6 },
+          { name: 'Henderson, Conor', app: 21, gs: 0, era: 4.07, w: 2, l: 4, sv: 3, ip: 42.0, h: 45, r: 21, er: 19, bb: 26, so: 36, whip: 1.69 },
+          { name: 'Young, Jake', app: 10, gs: 4, era: 4.37, w: 3, l: 2, sv: 0, ip: 22.2, h: 21, r: 12, er: 11, bb: 8, so: 19, whip: 1.28 },
+          { name: 'Shattuck, Nate', app: 9, gs: 0, era: 5.23, w: 0, l: 1, sv: 0, ip: 10.1, h: 7, r: 6, er: 6, bb: 8, so: 9, whip: 1.45 },
+          { name: 'Kelly, Ryan', app: 14, gs: 1, era: 5.91, w: 1, l: 1, sv: 2, ip: 21.1, h: 30, r: 21, er: 14, bb: 10, so: 14, whip: 1.88 },
+          { name: 'Cosgrove, James', app: 14, gs: 0, era: 6.75, w: 1, l: 0, sv: 0, ip: 24.0, h: 23, r: 20, er: 18, bb: 18, so: 20, whip: 1.71 },
+          { name: 'Castile, Aiden', app: 10, gs: 0, era: 7.64, w: 2, l: 1, sv: 0, ip: 17.2, h: 21, r: 17, er: 15, bb: 15, so: 15, whip: 2.04 },
+          { name: 'Bailey, Brady', app: 5, gs: 5, era: 7.84, w: 1, l: 0, sv: 0, ip: 10.1, h: 15, r: 10, er: 9, bb: 5, so: 4, whip: 1.94 },
+          { name: 'Mullins, Maximus', app: 11, gs: 3, era: 7.91, w: 0, l: 0, sv: 1, ip: 19.1, h: 26, r: 20, er: 17, bb: 14, so: 13, whip: 2.07 },
+          { name: 'Buecker, Ryan', app: 8, gs: 3, era: 9.75, w: 1, l: 0, sv: 0, ip: 12.0, h: 10, r: 13, er: 13, bb: 11, so: 5, whip: 1.75 },
+          { name: 'MacKenzie, Kurtis', app: 11, gs: 4, era: 10.72, w: 0, l: 1, sv: 0, ip: 22.2, h: 34, r: 33, er: 27, bb: 17, so: 19, whip: 2.25 },
+          { name: 'Yost, Preston', app: 10, gs: 0, era: 11.57, w: 0, l: 3, sv: 0, ip: 18.2, h: 22, r: 25, er: 24, bb: 17, so: 8, whip: 2.09 },
+          { name: 'Nercessian, Tyson', app: 14, gs: 10, era: 11.79, w: 0, l: 3, sv: 0, ip: 29.0, h: 48, r: 43, er: 38, bb: 20, so: 15, whip: 2.34 },
+          { name: 'Sealing, Austin', app: 6, gs: 2, era: 13.5, w: 2, l: 2, sv: 0, ip: 10.0, h: 18, r: 15, er: 15, bb: 7, so: 5, whip: 2.5 }
+        ]
+      },
+      wac: {
+        batters: [
+          { name: 'OConnor, Matt', gp: 17, ab: 43, avg: 0.419, h: 18, doubles: 3, triples: 1, hr: 0, rbi: 11, r: 10, bb: 3, so: 3, sb: 2, ops: 0.993 },
+          { name: 'Dardaris, Alex', gp: 15, ab: 41, avg: 0.415, h: 17, doubles: 4, triples: 1, hr: 1, rbi: 7, r: 5, bb: 5, so: 10, sb: 2, ops: 1.134 },
+          { name: 'Stolze, Zach', gp: 39, ab: 140, avg: 0.357, h: 50, doubles: 13, triples: 0, hr: 6, rbi: 31, r: 44, bb: 20, so: 27, sb: 6, ops: 1.062 },
+          { name: 'Turner, Will', gp: 40, ab: 172, avg: 0.349, h: 60, doubles: 13, triples: 2, hr: 6, rbi: 32, r: 37, bb: 8, so: 33, sb: 10, ops: 0.946 },
+          { name: 'Hirsh, Reese', gp: 33, ab: 119, avg: 0.345, h: 41, doubles: 11, triples: 0, hr: 1, rbi: 33, r: 24, bb: 18, so: 11, sb: 3, ops: 0.899 },
+          { name: 'Ruppel, Chase', gp: 39, ab: 158, avg: 0.31, h: 49, doubles: 10, triples: 0, hr: 10, rbi: 34, r: 33, bb: 13, so: 46, sb: 6, ops: 0.943 },
+          { name: 'Wozniak, Brady', gp: 35, ab: 110, avg: 0.309, h: 34, doubles: 11, triples: 3, hr: 0, rbi: 31, r: 17, bb: 16, so: 22, sb: 12, ops: 0.88 },
+          { name: 'Kinsey, Drew', gp: 39, ab: 130, avg: 0.3, h: 39, doubles: 8, triples: 1, hr: 11, rbi: 35, r: 42, bb: 22, so: 16, sb: 6, ops: 1.078 },
+          { name: 'SanFilippo, Scooter', gp: 39, ab: 140, avg: 0.293, h: 41, doubles: 9, triples: 1, hr: 1, rbi: 26, r: 30, bb: 18, so: 26, sb: 10, ops: 0.761 },
+          { name: 'Miller, Nick', gp: 15, ab: 33, avg: 0.273, h: 9, doubles: 1, triples: 0, hr: 1, rbi: 5, r: 6, bb: 3, so: 6, sb: 2, ops: 0.718 },
+          { name: 'Everitt, Ty', gp: 39, ab: 163, avg: 0.264, h: 43, doubles: 12, triples: 0, hr: 1, rbi: 13, r: 38, bb: 17, so: 19, sb: 15, ops: 0.712 },
+          { name: 'Lewis, Matt', gp: 26, ab: 80, avg: 0.263, h: 21, doubles: 2, triples: 0, hr: 0, rbi: 12, r: 17, bb: 2, so: 17, sb: 13, ops: 0.577 }
+        ],
+        pitchers: [
+          { name: 'Philiposian, Elias', app: 12, gs: 0, era: 3.45, w: 0, l: 1, sv: 1, ip: 15.2, h: 18, r: 11, er: 6, bb: 5, so: 10, whip: 1.47 },
+          { name: 'McCloskey, Connor', app: 11, gs: 10, era: 4.85, w: 3, l: 4, sv: 0, ip: 55.2, h: 59, r: 35, er: 30, bb: 27, so: 39, whip: 1.54 },
+          { name: 'DiGrazio, Nico', app: 12, gs: 11, era: 4.91, w: 7, l: 2, sv: 1, ip: 58.2, h: 74, r: 36, er: 32, bb: 23, so: 34, whip: 1.65 },
+          { name: 'Herbert, Matt', app: 10, gs: 6, era: 5.24, w: 0, l: 2, sv: 2, ip: 44.2, h: 55, r: 32, er: 26, bb: 17, so: 29, whip: 1.61 },
+          { name: 'Spurgeon, Brayden', app: 10, gs: 4, era: 7.62, w: 2, l: 2, sv: 0, ip: 28.1, h: 36, r: 30, er: 24, bb: 11, so: 22, whip: 1.66 },
+          { name: 'Corda, Matt', app: 11, gs: 1, era: 8.15, w: 3, l: 1, sv: 0, ip: 17.2, h: 25, r: 16, er: 16, bb: 7, so: 12, whip: 1.81 },
+          { name: 'Ruga, Logan', app: 12, gs: 2, era: 10.8, w: 0, l: 2, sv: 1, ip: 21.2, h: 32, r: 31, er: 26, bb: 23, so: 20, whip: 2.54 },
+          { name: 'Bishop, Matt', app: 9, gs: 1, era: 10.8, w: 1, l: 2, sv: 0, ip: 26.2, h: 50, r: 39, er: 32, bb: 10, so: 14, whip: 2.25 },
+          { name: 'Girillo, Luke', app: 12, gs: 0, era: 10.8, w: 1, l: 0, sv: 0, ip: 10.0, h: 12, r: 12, er: 12, bb: 10, so: 11, whip: 2.2 }
+        ]
+      },
+      fandm: {
+        batters: [
+          { name: 'Falese, Bobby', gp: 40, ab: 173, avg: 0.399, h: 69, doubles: 21, triples: 4, hr: 3, rbi: 40, r: 37, bb: 17, so: 20, sb: 4, ops: 1.077 },
+          { name: 'McCloskey, Nolan', gp: 31, ab: 98, avg: 0.337, h: 33, doubles: 5, triples: 1, hr: 0, rbi: 12, r: 26, bb: 22, so: 9, sb: 10, ops: 0.9 },
+          { name: 'Rush, Conner', gp: 24, ab: 75, avg: 0.333, h: 25, doubles: 6, triples: 0, hr: 0, rbi: 10, r: 9, bb: 6, so: 11, sb: 0, ops: 0.811 },
+          { name: 'Hollender, Matt', gp: 29, ab: 87, avg: 0.31, h: 27, doubles: 10, triples: 1, hr: 5, rbi: 26, r: 18, bb: 13, so: 19, sb: 1, ops: 1.034 },
+          { name: 'Filippelli, Andrew', gp: 38, ab: 136, avg: 0.301, h: 41, doubles: 8, triples: 1, hr: 1, rbi: 30, r: 19, bb: 12, so: 12, sb: 0, ops: 0.778 },
+          { name: 'Mackenzie, Colin', gp: 33, ab: 70, avg: 0.3, h: 21, doubles: 3, triples: 0, hr: 0, rbi: 9, r: 16, bb: 6, so: 17, sb: 2, ops: 0.723 },
+          { name: 'Wolpert, Tanner', gp: 39, ab: 141, avg: 0.298, h: 42, doubles: 9, triples: 0, hr: 4, rbi: 34, r: 30, bb: 15, so: 27, sb: 7, ops: 0.837 },
+          { name: 'Lorenzo, Nick', gp: 40, ab: 130, avg: 0.285, h: 37, doubles: 3, triples: 0, hr: 0, rbi: 20, r: 30, bb: 27, so: 10, sb: 4, ops: 0.721 },
+          { name: 'Desautels, AJ', gp: 40, ab: 143, avg: 0.273, h: 39, doubles: 7, triples: 2, hr: 3, rbi: 25, r: 41, bb: 25, so: 22, sb: 20, ops: 0.83 },
+          { name: 'DiGiacomo, Nick', gp: 26, ab: 78, avg: 0.269, h: 21, doubles: 9, triples: 0, hr: 0, rbi: 16, r: 18, bb: 17, so: 26, sb: 5, ops: 0.811 },
+          { name: 'Schwartz, Gideon', gp: 24, ab: 55, avg: 0.236, h: 13, doubles: 4, triples: 0, hr: 0, rbi: 12, r: 10, bb: 9, so: 11, sb: 1, ops: 0.662 },
+          { name: 'von Zuben, Michael', gp: 32, ab: 94, avg: 0.234, h: 22, doubles: 4, triples: 1, hr: 0, rbi: 16, r: 19, bb: 9, so: 24, sb: 6, ops: 0.631 }
+        ],
+        pitchers: [
+          { name: 'Mullen, Peter', app: 10, gs: 8, era: 3.53, w: 1, l: 2, sv: 0, ip: 43.1, h: 42, r: 25, er: 17, bb: 30, so: 49, whip: 1.66 },
+          { name: 'Galef, Dan', app: 14, gs: 9, era: 3.73, w: 7, l: 1, sv: 1, ip: 62.2, h: 68, r: 33, er: 26, bb: 29, so: 68, whip: 1.55 },
+          { name: 'Mackenzie, Colin', app: 9, gs: 4, era: 4.41, w: 3, l: 1, sv: 0, ip: 34.2, h: 35, r: 19, er: 17, bb: 10, so: 23, whip: 1.3 },
+          { name: 'Marshall, Luca', app: 9, gs: 2, era: 4.42, w: 0, l: 2, sv: 0, ip: 18.1, h: 18, r: 14, er: 9, bb: 14, so: 23, whip: 1.75 },
+          { name: 'Anvar, Bijan', app: 15, gs: 8, era: 5.14, w: 4, l: 4, sv: 4, ip: 42.0, h: 43, r: 28, er: 24, bb: 26, so: 37, whip: 1.64 },
+          { name: 'Rebane, Shane', app: 10, gs: 1, era: 5.54, w: 0, l: 1, sv: 2, ip: 13.0, h: 16, r: 12, er: 8, bb: 5, so: 1, whip: 1.62 },
+          { name: 'McGeorge, David', app: 13, gs: 0, era: 6.82, w: 2, l: 3, sv: 1, ip: 34.1, h: 31, r: 29, er: 26, bb: 18, so: 28, whip: 1.43 },
+          { name: 'Keller, Kiernan', app: 14, gs: 6, era: 6.94, w: 3, l: 3, sv: 1, ip: 36.1, h: 43, r: 40, er: 28, bb: 23, so: 27, whip: 1.82 },
+          { name: 'Holl, Sebastian', app: 11, gs: 2, era: 7.84, w: 0, l: 1, sv: 2, ip: 10.1, h: 10, r: 9, er: 9, bb: 10, so: 8, whip: 1.94 },
+          { name: 'Snow, Anders', app: 12, gs: 0, era: 8.44, w: 1, l: 1, sv: 0, ip: 16.0, h: 18, r: 15, er: 15, bb: 7, so: 8, whip: 1.56 }
+        ]
+      },
+      swa: {
+        batters: [
+          { name: 'Sullivan, Aidan', gp: 42, ab: 168, avg: 0.363, h: 61, doubles: 11, triples: 3, hr: 5, rbi: 35, r: 57, bb: 36, so: 29, sb: 23, ops: 1.037 },
+          { name: 'Silvestre, Matthew', gp: 40, ab: 137, avg: 0.358, h: 49, doubles: 5, triples: 0, hr: 5, rbi: 34, r: 35, bb: 28, so: 16, sb: 10, ops: 0.981 },
+          { name: 'Roffwarg, Max', gp: 40, ab: 151, avg: 0.344, h: 52, doubles: 7, triples: 3, hr: 3, rbi: 34, r: 42, bb: 18, so: 18, sb: 13, ops: 0.935 },
+          { name: 'Kedar, Leor', gp: 38, ab: 147, avg: 0.333, h: 49, doubles: 14, triples: 3, hr: 4, rbi: 20, r: 45, bb: 19, so: 22, sb: 18, ops: 0.991 },
+          { name: 'Buchman, Benjamin', gp: 41, ab: 138, avg: 0.326, h: 45, doubles: 11, triples: 0, hr: 7, rbi: 32, r: 33, bb: 28, so: 24, sb: 14, ops: 0.982 },
+          { name: 'Schuman, Stephen', gp: 39, ab: 141, avg: 0.298, h: 42, doubles: 11, triples: 3, hr: 7, rbi: 43, r: 31, bb: 12, so: 47, sb: 1, ops: 0.946 },
+          { name: 'Cohn, Ethan', gp: 38, ab: 138, avg: 0.283, h: 39, doubles: 11, triples: 3, hr: 7, rbi: 43, r: 35, bb: 24, so: 33, sb: 1, ops: 0.917 },
+          { name: 'Farber, Dov', gp: 38, ab: 116, avg: 0.276, h: 32, doubles: 8, triples: 0, hr: 2, rbi: 24, r: 18, bb: 18, so: 26, sb: 2, ops: 0.811 },
+          { name: 'Barry, Evan', gp: 34, ab: 100, avg: 0.27, h: 27, doubles: 7, triples: 0, hr: 1, rbi: 23, r: 22, bb: 10, so: 16, sb: 0, ops: 0.778 },
+          { name: 'Lewis, Sammy', gp: 23, ab: 69, avg: 0.261, h: 18, doubles: 1, triples: 0, hr: 1, rbi: 11, r: 11, bb: 8, so: 6, sb: 11, ops: 0.704 },
+          { name: 'Evanitsky, Ben', gp: 26, ab: 43, avg: 0.163, h: 7, doubles: 2, triples: 0, hr: 0, rbi: 3, r: 13, bb: 10, so: 9, sb: 9, ops: 0.499 }
+        ],
+        pitchers: [
+          { name: 'Potthoff, Zach', app: 8, gs: 3, era: 1.69, w: 0, l: 1, sv: 0, ip: 16.0, h: 10, r: 4, er: 3, bb: 5, so: 12, whip: 0.94 },
+          { name: 'Elliott, Gabe', app: 8, gs: 2, era: 2.7, w: 1, l: 0, sv: 0, ip: 10.0, h: 12, r: 4, er: 3, bb: 7, so: 6, whip: 1.9 },
+          { name: 'Schwartz, Ezra', app: 7, gs: 1, era: 3.24, w: 0, l: 1, sv: 0, ip: 16.2, h: 22, r: 8, er: 6, bb: 3, so: 4, whip: 1.5 },
+          { name: 'Tinker, Aidan', app: 9, gs: 6, era: 4.89, w: 2, l: 2, sv: 0, ip: 31.1, h: 28, r: 20, er: 17, bb: 20, so: 15, whip: 1.53 },
+          { name: 'Alpern, Liam', app: 11, gs: 10, era: 4.93, w: 3, l: 3, sv: 0, ip: 53.0, h: 56, r: 36, er: 29, bb: 30, so: 49, whip: 1.62 },
+          { name: 'Harrold, Mac', app: 11, gs: 6, era: 6.83, w: 4, l: 3, sv: 0, ip: 37.0, h: 41, r: 32, er: 28, bb: 18, so: 34, whip: 1.59 },
+          { name: 'Bennett, Jackson', app: 13, gs: 1, era: 6.83, w: 2, l: 1, sv: 1, ip: 27.2, h: 37, r: 23, er: 21, bb: 12, so: 27, whip: 1.77 },
+          { name: 'Parilla, Dylan', app: 10, gs: 1, era: 7.36, w: 4, l: 0, sv: 2, ip: 14.2, h: 22, r: 14, er: 12, bb: 8, so: 14, whip: 2.05 },
+          { name: 'McCarthy, James', app: 9, gs: 5, era: 9.0, w: 1, l: 2, sv: 0, ip: 21.0, h: 28, r: 21, er: 21, bb: 10, so: 18, whip: 1.81 },
+          { name: 'Ward, Jack', app: 9, gs: 0, era: 9.45, w: 2, l: 3, sv: 0, ip: 13.1, h: 20, r: 16, er: 14, bb: 7, so: 11, whip: 2.03 },
+          { name: 'Zhu, Kevin', app: 10, gs: 4, era: 9.64, w: 2, l: 1, sv: 0, ip: 18.2, h: 28, r: 22, er: 20, bb: 15, so: 17, whip: 2.3 },
+          { name: 'Evanitsky, Ben', app: 8, gs: 3, era: 10.5, w: 2, l: 1, sv: 1, ip: 12.0, h: 17, r: 15, er: 14, bb: 16, so: 12, whip: 2.75 },
+          { name: 'Gippin, Ethan', app: 8, gs: 0, era: 11.81, w: 1, l: 0, sv: 0, ip: 10.2, h: 11, r: 15, er: 14, bb: 17, so: 9, whip: 2.63 }
+        ]
+      },
+      urs: {
+        batters: [
+          { name: 'Sullivan, Brandon', gp: 40, ab: 139, avg: 0.367, h: 51, doubles: 7, triples: 0, hr: 0, rbi: 21, r: 43, bb: 21, so: 14, sb: 42, ops: 0.93 },
+          { name: 'Richter, Andrew', gp: 40, ab: 155, avg: 0.316, h: 49, doubles: 10, triples: 0, hr: 1, rbi: 36, r: 28, bb: 18, so: 15, sb: 5, ops: 0.796 },
+          { name: 'Williams, Jordan', gp: 36, ab: 121, avg: 0.306, h: 37, doubles: 9, triples: 0, hr: 1, rbi: 23, r: 32, bb: 17, so: 15, sb: 14, ops: 0.858 },
+          { name: 'Cantor, Jakob', gp: 40, ab: 137, avg: 0.277, h: 38, doubles: 7, triples: 0, hr: 0, rbi: 26, r: 27, bb: 26, so: 21, sb: 10, ops: 0.785 },
+          { name: 'Gilhool, Jude', gp: 29, ab: 103, avg: 0.272, h: 28, doubles: 8, triples: 0, hr: 1, rbi: 16, r: 18, bb: 14, so: 25, sb: 0, ops: 0.773 },
+          { name: 'Gupta, Ethan', gp: 38, ab: 140, avg: 0.271, h: 38, doubles: 6, triples: 0, hr: 5, rbi: 35, r: 28, bb: 13, so: 35, sb: 2, ops: 0.792 },
+          { name: 'McDonnell, Tyler', gp: 32, ab: 95, avg: 0.263, h: 25, doubles: 5, triples: 2, hr: 2, rbi: 18, r: 17, bb: 16, so: 16, sb: 10, ops: 0.837 },
+          { name: 'Wilt, Caleb', gp: 31, ab: 93, avg: 0.247, h: 23, doubles: 5, triples: 0, hr: 1, rbi: 21, r: 18, bb: 18, so: 29, sb: 4, ops: 0.782 },
+          { name: 'Walsh, Andrew', gp: 34, ab: 79, avg: 0.241, h: 19, doubles: 4, triples: 0, hr: 0, rbi: 13, r: 17, bb: 14, so: 20, sb: 7, ops: 0.666 },
+          { name: 'Murphy, Aidan', gp: 24, ab: 51, avg: 0.235, h: 12, doubles: 2, triples: 0, hr: 0, rbi: 5, r: 6, bb: 1, so: 10, sb: 1, ops: 0.532 },
+          { name: 'Salita, Nathan', gp: 22, ab: 49, avg: 0.163, h: 8, doubles: 0, triples: 0, hr: 0, rbi: 6, r: 10, bb: 8, so: 9, sb: 4, ops: 0.461 }
+        ],
+        pitchers: [
+          { name: 'Shilstone, Max', app: 9, gs: 2, era: 3.14, w: 1, l: 0, sv: 0, ip: 14.1, h: 15, r: 7, er: 5, bb: 4, so: 9, whip: 1.33 },
+          { name: 'Morgan, David', app: 10, gs: 6, era: 3.15, w: 2, l: 2, sv: 0, ip: 40.0, h: 38, r: 15, er: 14, bb: 6, so: 20, whip: 1.1 },
+          { name: 'Hollander, Kieran', app: 12, gs: 9, era: 3.47, w: 3, l: 2, sv: 0, ip: 49.1, h: 46, r: 25, er: 19, bb: 14, so: 34, whip: 1.22 },
+          { name: 'Ross, Barritt', app: 11, gs: 4, era: 3.65, w: 0, l: 2, sv: 0, ip: 24.2, h: 21, r: 12, er: 10, bb: 9, so: 12, whip: 1.22 },
+          { name: 'Shea, Michael', app: 11, gs: 7, era: 3.92, w: 5, l: 3, sv: 0, ip: 41.1, h: 44, r: 28, er: 18, bb: 16, so: 36, whip: 1.45 },
+          { name: 'Goldstein, Daniel', app: 11, gs: 7, era: 5.5, w: 5, l: 4, sv: 0, ip: 36.0, h: 41, r: 31, er: 22, bb: 19, so: 35, whip: 1.67 },
+          { name: 'Leahy, Christopher', app: 10, gs: 1, era: 5.65, w: 0, l: 2, sv: 0, ip: 28.2, h: 28, r: 21, er: 18, bb: 14, so: 27, whip: 1.47 },
+          { name: 'Regan, Thomas', app: 11, gs: 0, era: 7.62, w: 2, l: 1, sv: 1, ip: 13.0, h: 15, r: 13, er: 11, bb: 7, so: 11, whip: 1.69 },
+          { name: 'Goodman, Zachary', app: 6, gs: 3, era: 8.49, w: 1, l: 2, sv: 0, ip: 11.2, h: 18, r: 13, er: 11, bb: 7, so: 10, whip: 2.14 },
+          { name: 'DeWeese, Blake', app: 6, gs: 1, era: 9.58, w: 1, l: 1, sv: 0, ip: 10.1, h: 14, r: 11, er: 11, bb: 2, so: 11, whip: 1.55 },
+          { name: 'Blum, Caleb', app: 8, gs: 0, era: 9.69, w: 0, l: 0, sv: 1, ip: 13.0, h: 20, r: 17, er: 14, bb: 12, so: 18, whip: 2.46 }
+        ]
+      },
+      dick: {
+        batters: [
+          { name: 'Schmidt, Kevin', gp: 30, ab: 97, avg: 0.402, h: 39, doubles: 8, triples: 0, hr: 1, rbi: 26, r: 17, bb: 9, so: 14, sb: 1, ops: 1.035 },
+          { name: 'Thompson, Ryan', gp: 35, ab: 121, avg: 0.38, h: 46, doubles: 3, triples: 0, hr: 1, rbi: 20, r: 29, bb: 18, so: 9, sb: 5, ops: 0.989 },
+          { name: 'Torres, Matt', gp: 35, ab: 106, avg: 0.33, h: 35, doubles: 10, triples: 0, hr: 3, rbi: 21, r: 19, bb: 13, so: 20, sb: 1, ops: 0.97 },
+          { name: 'Sigmon, Kaden', gp: 35, ab: 130, avg: 0.308, h: 40, doubles: 5, triples: 1, hr: 3, rbi: 25, r: 23, bb: 13, so: 22, sb: 7, ops: 0.862 },
+          { name: 'Gartland, Luke', gp: 31, ab: 107, avg: 0.299, h: 32, doubles: 5, triples: 2, hr: 0, rbi: 13, r: 20, bb: 14, so: 26, sb: 13, ops: 0.831 },
+          { name: 'Colwell, Jackson', gp: 32, ab: 99, avg: 0.283, h: 28, doubles: 3, triples: 0, hr: 0, rbi: 12, r: 20, bb: 17, so: 19, sb: 10, ops: 0.756 },
+          { name: 'Capanear, Nolan', gp: 35, ab: 121, avg: 0.273, h: 33, doubles: 8, triples: 0, hr: 1, rbi: 16, r: 23, bb: 12, so: 20, sb: 9, ops: 0.775 },
+          { name: 'Price, Jimmy', gp: 30, ab: 95, avg: 0.263, h: 25, doubles: 6, triples: 0, hr: 0, rbi: 17, r: 21, bb: 9, so: 20, sb: 6, ops: 0.703 },
+          { name: 'Gearhart, Cooper', gp: 16, ab: 52, avg: 0.25, h: 13, doubles: 1, triples: 0, hr: 0, rbi: 3, r: 11, bb: 6, so: 9, sb: 4, ops: 0.655 },
+          { name: 'Dellaquila, Gabe', gp: 19, ab: 50, avg: 0.24, h: 12, doubles: 2, triples: 0, hr: 0, rbi: 5, r: 7, bb: 4, so: 13, sb: 3, ops: 0.596 },
+          { name: 'Mitchell, Jake', gp: 19, ab: 42, avg: 0.19, h: 8, doubles: 0, triples: 0, hr: 1, rbi: 7, r: 8, bb: 8, so: 10, sb: 0, ops: 0.623 },
+          { name: 'Senko, RJ', gp: 15, ab: 30, avg: 0.133, h: 4, doubles: 0, triples: 0, hr: 0, rbi: 1, r: 5, bb: 3, so: 6, sb: 4, ops: 0.366 }
+        ],
+        pitchers: [
+          { name: 'Norton, Drew', app: 8, gs: 7, era: 2.92, w: 2, l: 3, sv: 0, ip: 37.0, h: 37, r: 20, er: 12, bb: 4, so: 26, whip: 1.11 },
+          { name: 'Myers, Ben', app: 12, gs: 7, era: 3.89, w: 1, l: 2, sv: 0, ip: 39.1, h: 42, r: 22, er: 17, bb: 11, so: 31, whip: 1.35 },
+          { name: 'Peichel, Koll', app: 10, gs: 8, era: 4.17, w: 3, l: 2, sv: 0, ip: 45.1, h: 44, r: 24, er: 21, bb: 19, so: 38, whip: 1.39 },
+          { name: 'Buzza, Austin', app: 13, gs: 10, era: 5.24, w: 4, l: 3, sv: 0, ip: 56.2, h: 65, r: 39, er: 33, bb: 19, so: 44, whip: 1.48 },
+          { name: 'Walker, Grayson', app: 13, gs: 3, era: 5.97, w: 2, l: 3, sv: 0, ip: 49.2, h: 44, r: 37, er: 33, bb: 28, so: 51, whip: 1.45 },
+          { name: 'Harrison, Riley', app: 7, gs: 0, era: 6.52, w: 2, l: 2, sv: 0, ip: 9.2, h: 7, r: 8, er: 7, bb: 9, so: 17, whip: 1.66 },
+          { name: 'Neeld, Luke', app: 6, gs: 0, era: 6.75, w: 1, l: 1, sv: 0, ip: 10.2, h: 17, r: 10, er: 8, bb: 2, so: 9, whip: 1.78 },
+          { name: 'Kolman, Jackson', app: 8, gs: 0, era: 9.0, w: 1, l: 2, sv: 0, ip: 11.0, h: 13, r: 14, er: 11, bb: 8, so: 13, whip: 1.91 }
+        ]
+      }
+    };
+
+    // ============================================================================
+    // UTILITIES
+    // ============================================================================
+    const fmt = (n, d=3) => n ? (d === 3 ? n.toFixed(3).replace(/^0/, '') : n.toFixed(d)) : (d === 3 ? '.000' : '0.00');
+    const cmp = (m, o, lower=false) => lower ? (m < o ? 'better' : m > o ? 'worse' : 'eq') : (m > o ? 'better' : m < o ? 'worse' : 'eq');
+
+    // ============================================================================
+    // API
+    // ============================================================================
+    async function genReport(muh, opp, oppName, perspective) {
+      const isForMuh = perspective === 'muhlenberg';
+      const forTeam = isForMuh ? 'Muhlenberg' : oppName;
+      const againstTeam = isForMuh ? oppName : 'Muhlenberg';
+      const forStats = isForMuh ? muh : opp;
+      const againstStats = isForMuh ? opp : muh;
+
+      const prompt = `You are an experienced college baseball scout preparing a scouting report for ${forTeam} before they face ${againstTeam}.
+
+${forTeam.toUpperCase()} (Your Team):
+- Batting: ${fmt(forStats.batting.avg)} AVG, ${fmt(forStats.batting.obp)} OBP, ${fmt(forStats.batting.slg)} SLG, ${forStats.batting.hr} HR
+- Pitching: ${fmt(forStats.pitching.era,2)} ERA, ${fmt(forStats.pitching.whip,2)} WHIP
+- Record: ${forStats.pitching.wins}-${forStats.pitching.losses}
+
+${againstTeam.toUpperCase()} (Opponent):
+- Batting: ${fmt(againstStats.batting.avg)} AVG, ${fmt(againstStats.batting.obp)} OBP, ${fmt(againstStats.batting.slg)} SLG, ${againstStats.batting.hr} HR
+- Pitching: ${fmt(againstStats.pitching.era,2)} ERA, ${fmt(againstStats.pitching.whip,2)} WHIP
+- Record: ${againstStats.pitching.wins}-${againstStats.pitching.losses}
+
+Write a 250-word scouting report for ${forTeam}'s coaching staff. This report is ONLY for ${forTeam} - do NOT include any advice for ${againstTeam}.
+
+Sections (use ALL CAPS headers, no markdown):
+MATCHUP ANALYSIS - Statistical advantages/disadvantages for ${forTeam}
+OFFENSIVE APPROACH - How ${forTeam} hitters should approach ${againstTeam}'s pitching
+PITCHING STRATEGY - How ${forTeam} pitchers should attack ${againstTeam}'s lineup
+OPPONENT THREATS - ${againstTeam}'s most dangerous players
+GAME PLAN - Tactical recommendations for ${forTeam}
+
+Tone: Professional, analytical, matter-of-fact. Data-driven statements, no colorful commentary.`;
+
+      const res = await fetch('http://localhost:5000/api/scout-report', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'API error');
+      return data.report;
+    }
+
+    // ============================================================================
+    // COMPONENTS
+    // ============================================================================
+
+    // CSS Bar Chart with winner indicator
+    function BarChart({ data, title, oppName, lowerIsBetter = false }) {
+      const max = Math.max(...data.flatMap(d => [d.muh, d.opp])) * 1.1;
+      return (
+        <div className="bg-gray-800 rounded-xl p-4 border border-gray-700">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-semibold text-white">{title}</h3>
+            <div className="flex items-center gap-4 text-xs">
+              <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded bg-red-700"></div><span className="text-gray-400">Muhlenberg</span></div>
+              <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded bg-blue-600"></div><span className="text-gray-400">{oppName || 'Opponent'}</span></div>
+            </div>
+          </div>
+          <div className="space-y-4">
+            {data.map(d => {
+              const lower = d.lowerIsBetter !== undefined ? d.lowerIsBetter : lowerIsBetter;
+              const muhWins = lower ? d.muh < d.opp : d.muh > d.opp;
+              const oppWins = lower ? d.opp < d.muh : d.opp > d.muh;
+              const tie = d.muh === d.opp;
+              return (
+                <div key={d.label} className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-gray-400 font-medium">{d.label}</span>
+                    {!tie && (
+                      <span className={`text-xs font-semibold px-2 py-0.5 rounded ${muhWins ? 'bg-red-900/50 text-red-400' : 'bg-blue-900/50 text-blue-400'}`}>
+                        {muhWins ? '← MUH' : `${oppName?.slice(0,3).toUpperCase() || 'OPP'} →`}
+                      </span>
+                    )}
+                  </div>
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1 bg-gray-700 rounded-full h-6 overflow-hidden">
+                        <div className={`h-full rounded-full transition-all ${muhWins ? 'bg-red-600' : tie ? 'bg-red-800' : 'bg-red-900/60'}`} style={{width: `${(d.muh/max)*100}%`}}></div>
+                      </div>
+                      <span className={`text-sm font-mono w-14 text-right font-semibold ${muhWins ? 'text-red-400' : 'text-gray-500'}`}>{d.format ? d.format(d.muh) : d.muh}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1 bg-gray-700 rounded-full h-6 overflow-hidden">
+                        <div className={`h-full rounded-full transition-all ${oppWins ? 'bg-blue-600' : tie ? 'bg-blue-800' : 'bg-blue-900/60'}`} style={{width: `${(d.opp/max)*100}%`}}></div>
+                      </div>
+                      <span className={`text-sm font-mono w-14 text-right font-semibold ${oppWins ? 'text-blue-400' : 'text-gray-500'}`}>{d.format ? d.format(d.opp) : d.opp}</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      );
+    }
+
+    function TeamSelect({ value, onChange }) {
+      return (
+        <div className="relative inline-block">
+          <select value={value} onChange={e => onChange(e.target.value)} className="appearance-none bg-gray-800 border border-gray-600 rounded-lg px-4 py-2 pr-8 text-white font-medium cursor-pointer hover:border-orange-500 focus:outline-none focus:border-orange-500">
+            {Object.values(TEAMS).filter(t => !t.isHome).map(t => <option key={t.code} value={t.code}>{t.name}</option>)}
+          </select>
+          <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+        </div>
+      );
+    }
+
+    function AllTeamSelect({ value, onChange }) {
+      return (
+        <div className="relative inline-block">
+          <select value={value} onChange={e => onChange(e.target.value)} className="appearance-none bg-gray-800 border border-gray-600 rounded-lg px-4 py-2 pr-8 text-white font-medium cursor-pointer hover:border-orange-500 focus:outline-none focus:border-orange-500">
+            {Object.values(TEAMS).map(t => <option key={t.code} value={t.code}>{t.name}</option>)}
+          </select>
+          <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+        </div>
+      );
+    }
+
+    function ApiKey({ value, onChange }) {
+      const [show, setShow] = useState(false);
+      return (
+        <div className="flex items-center gap-2 bg-gray-800 border border-gray-600 rounded-lg px-3 py-2">
+          <Key className="text-gray-500" />
+          <input type={show ? 'text' : 'password'} placeholder="Anthropic API Key" value={value} onChange={e => onChange(e.target.value)} className="bg-transparent flex-1 outline-none text-sm text-gray-300 placeholder-gray-500 w-44" />
+          <button onClick={() => setShow(!show)} className="text-gray-500 hover:text-gray-300">{show ? <EyeOff /> : <Eye />}</button>
+        </div>
+      );
+    }
+
+    function StatCard({ title, icon: Icon, stats, type }) {
+      const items = type === 'batting'
+        ? [{l:'AVG',v:fmt(stats.avg)},{l:'OBP',v:fmt(stats.obp)},{l:'SLG',v:fmt(stats.slg)},{l:'HR',v:stats.hr},{l:'RBI',v:stats.rbi},{l:'SB',v:stats.sb}]
+        : [{l:'ERA',v:fmt(stats.era,2)},{l:'WHIP',v:fmt(stats.whip,2)},{l:'K',v:stats.so},{l:'BB',v:stats.bb},{l:'W-L',v:`${stats.wins}-${stats.losses}`},{l:'FLD%',v:(stats.fldPct*100).toFixed(1)}];
+      return (
+        <div className="bg-gray-800 rounded-xl p-4 border border-gray-700">
+          <div className="flex items-center gap-2 mb-4"><Icon className="text-orange-500" /><h3 className="font-semibold text-white">{title}</h3></div>
+          <div className="grid grid-cols-3 gap-3">
+            {items.map(i => <div key={i.l} className="text-center"><div className="text-xl font-bold text-white">{i.v}</div><div className="text-xs text-gray-500 uppercase">{i.l}</div></div>)}
+          </div>
+        </div>
+      );
+    }
+
+    function PlayerTable({ players, type, showAll = false }) {
+      const [sortBy, setSort] = useState(type === 'batters' ? 'avg' : 'era');
+      const [dir, setDir] = useState(type === 'batters' ? 'desc' : 'asc');
+      const toggle = k => { if (sortBy === k) setDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSort(k); setDir(k === 'era' ? 'asc' : 'desc'); } };
+
+      // Filter by threshold first, then sort
+      const sorted = useMemo(() => {
+        const qualified = players.filter(p =>
+          type === 'batters' ? (p.ab || 0) >= MIN_AB : (p.ip || 0) >= MIN_IP
+        );
+        return qualified.sort((a,b) => dir === 'asc' ? (a[sortBy]||0)-(b[sortBy]||0) : (b[sortBy]||0)-(a[sortBy]||0));
+      }, [players, sortBy, dir, type]);
+
+      const displayPlayers = showAll ? sorted : sorted.slice(0,8);
+      const cols = type === 'batters' ? [['name','Player'],['avg','AVG'],['hr','HR'],['rbi','RBI'],['r','R'],['sb','SB']] : [['name','Player'],['era','ERA'],['w','W'],['l','L'],['so','K'],['bb','BB']];
+      return (
+        <div className="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
+          <table className="w-full">
+            <thead><tr className="bg-gray-700">{cols.map(([k,l]) => <th key={k} onClick={() => k !== 'name' && toggle(k)} className={`px-4 py-3 text-left text-xs font-semibold uppercase ${k !== 'name' ? 'cursor-pointer hover:text-white' : ''} ${sortBy === k ? 'text-orange-500' : 'text-gray-400'}`}>{l}{sortBy === k && <span className="ml-1">{dir === 'asc' ? '↑' : '↓'}</span>}</th>)}</tr></thead>
+            <tbody className="divide-y divide-gray-700">
+              {displayPlayers.map((p,i) => (
+                <tr key={p.name+i} className="hover:bg-gray-700/50">
+                  <td className="px-4 py-3 text-white font-medium">{i < 3 && <span className="text-orange-500 mr-1">★</span>}{p.name}</td>
+                  {type === 'batters' ? <><td className="px-4 py-3 text-gray-300 font-mono">{fmt(p.avg)}</td><td className="px-4 py-3 text-gray-300">{p.hr}</td><td className="px-4 py-3 text-gray-300">{p.rbi}</td><td className="px-4 py-3 text-gray-300">{p.r}</td><td className="px-4 py-3 text-gray-300">{p.sb}</td></> : <><td className="px-4 py-3 text-gray-300 font-mono">{fmt(p.era,2)}</td><td className="px-4 py-3 text-gray-300">{p.w}</td><td className="px-4 py-3 text-gray-300">{p.l}</td><td className="px-4 py-3 text-gray-300">{p.so}</td><td className="px-4 py-3 text-gray-300">{p.bb}</td></>}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {!displayPlayers.length && <div className="p-8 text-center text-gray-500">No qualified players (min {type === 'batters' ? MIN_AB + ' AB' : MIN_IP + ' IP'})</div>}
+        </div>
+      );
+    }
+
+    function FullStatsTable({ players, type }) {
+      const [sortBy, setSort] = useState(type === 'batters' ? 'avg' : 'era');
+      const [dir, setDir] = useState(type === 'batters' ? 'desc' : 'asc');
+      const toggle = k => { if (sortBy === k) setDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSort(k); setDir(k === 'era' ? 'asc' : 'desc'); } };
+
+      const sorted = useMemo(() => {
+        const qualified = players.filter(p =>
+          type === 'batters' ? (p.ab || 0) >= MIN_AB : (p.ip || 0) >= MIN_IP
+        );
+        return qualified.sort((a,b) => dir === 'asc' ? (a[sortBy]||0)-(b[sortBy]||0) : (b[sortBy]||0)-(a[sortBy]||0));
+      }, [players, sortBy, dir, type]);
+
+      const battingCols = [['name','Player'],['gp','GP'],['ab','AB'],['avg','AVG'],['h','H'],['doubles','2B'],['triples','3B'],['hr','HR'],['rbi','RBI'],['r','R'],['bb','BB'],['so','SO'],['sb','SB'],['ops','OPS']];
+      const pitchingCols = [['name','Player'],['app','APP'],['gs','GS'],['era','ERA'],['w','W'],['l','L'],['sv','SV'],['ip','IP'],['h','H'],['er','ER'],['bb','BB'],['so','K'],['whip','WHIP']];
+      const cols = type === 'batters' ? battingCols : pitchingCols;
+
+      return (
+        <div className="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-max">
+              <thead>
+                <tr className="bg-gray-700">
+                  {cols.map(([k,l]) => (
+                    <th key={k} onClick={() => k !== 'name' && toggle(k)} className={`px-3 py-3 text-left text-xs font-semibold uppercase whitespace-nowrap ${k !== 'name' ? 'cursor-pointer hover:text-white' : ''} ${sortBy === k ? 'text-orange-500' : 'text-gray-400'}`}>
+                      {l}{sortBy === k && <span className="ml-1">{dir === 'asc' ? '↑' : '↓'}</span>}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-700">
+                {sorted.map((p,i) => (
+                  <tr key={p.name+i} className={`hover:bg-gray-700/50 ${i < 3 ? 'bg-gray-700/30' : ''}`}>
+                    <td className="px-3 py-2 text-white font-medium whitespace-nowrap">{i < 3 && <span className="text-orange-500 mr-1">★</span>}{p.name}</td>
+                    {type === 'batters' ? (
+                      <>
+                        <td className="px-3 py-2 text-gray-300">{p.gp || 0}</td>
+                        <td className="px-3 py-2 text-gray-300">{p.ab || 0}</td>
+                        <td className="px-3 py-2 text-gray-300 font-mono">{fmt(p.avg)}</td>
+                        <td className="px-3 py-2 text-gray-300">{p.h || 0}</td>
+                        <td className="px-3 py-2 text-gray-300">{p.doubles || 0}</td>
+                        <td className="px-3 py-2 text-gray-300">{p.triples || 0}</td>
+                        <td className="px-3 py-2 text-gray-300">{p.hr || 0}</td>
+                        <td className="px-3 py-2 text-gray-300">{p.rbi || 0}</td>
+                        <td className="px-3 py-2 text-gray-300">{p.r || 0}</td>
+                        <td className="px-3 py-2 text-gray-300">{p.bb || 0}</td>
+                        <td className="px-3 py-2 text-gray-300">{p.so || 0}</td>
+                        <td className="px-3 py-2 text-gray-300">{p.sb || 0}</td>
+                        <td className="px-3 py-2 text-gray-300 font-mono">{p.ops ? p.ops.toFixed(3) : '.000'}</td>
+                      </>
+                    ) : (
+                      <>
+                        <td className="px-3 py-2 text-gray-300">{p.app || 0}</td>
+                        <td className="px-3 py-2 text-gray-300">{p.gs || 0}</td>
+                        <td className="px-3 py-2 text-gray-300 font-mono">{fmt(p.era,2)}</td>
+                        <td className="px-3 py-2 text-gray-300">{p.w || 0}</td>
+                        <td className="px-3 py-2 text-gray-300">{p.l || 0}</td>
+                        <td className="px-3 py-2 text-gray-300">{p.sv || 0}</td>
+                        <td className="px-3 py-2 text-gray-300">{p.ip || 0}</td>
+                        <td className="px-3 py-2 text-gray-300">{p.h || 0}</td>
+                        <td className="px-3 py-2 text-gray-300">{p.er || 0}</td>
+                        <td className="px-3 py-2 text-gray-300">{p.bb || 0}</td>
+                        <td className="px-3 py-2 text-gray-300">{p.so || 0}</td>
+                        <td className="px-3 py-2 text-gray-300 font-mono">{p.whip ? p.whip.toFixed(2) : '0.00'}</td>
+                      </>
+                    )}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {!sorted.length && <div className="p-8 text-center text-gray-500">No qualified players (min {type === 'batters' ? MIN_AB + ' AB' : MIN_IP + ' IP'})</div>}
+        </div>
+      );
+    }
+
+    function QuickStats({ muh, opp }) {
+      const perGame = [
+        { l: 'Runs/Game', m: (muh.batting.r/muh.batting.g).toFixed(1), o: (opp.batting.r/opp.batting.g).toFixed(1), c: cmp(muh.batting.r/muh.batting.g, opp.batting.r/opp.batting.g) },
+        { l: 'Team ERA', m: fmt(muh.pitching.era,2), o: fmt(opp.pitching.era,2), c: cmp(muh.pitching.era, opp.pitching.era, true) },
+        { l: 'Fielding %', m: (muh.pitching.fldPct*100).toFixed(1), o: (opp.pitching.fldPct*100).toFixed(1), c: cmp(muh.pitching.fldPct, opp.pitching.fldPct) }
+      ];
+      const season = [
+        { l: 'Home Runs', m: muh.batting.hr, o: opp.batting.hr, c: cmp(muh.batting.hr, opp.batting.hr) },
+        { l: 'Stolen Bases', m: muh.batting.sb, o: opp.batting.sb, c: cmp(muh.batting.sb, opp.batting.sb) },
+        { l: 'Strikeouts', m: muh.pitching.so, o: opp.pitching.so, c: cmp(muh.pitching.so, opp.pitching.so) }
+      ];
+      const StatBox = ({ i }) => {
+        const muhWins = i.c === 'better';
+        const oppWins = i.c === 'worse';
+        return (
+          <div className={`p-3 rounded-lg ${muhWins ? 'bg-green-900/40' : oppWins ? 'bg-red-900/40' : 'bg-gray-700/50'}`}>
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs text-gray-400 uppercase">{i.l}</span>
+              {muhWins && <span className="text-xs font-bold text-green-400 uppercase">Edge</span>}
+              {oppWins && <span className="text-xs font-bold text-red-400 uppercase">Behind</span>}
+            </div>
+            <div className="flex items-baseline justify-between">
+              <div>
+                <span className="text-xs text-gray-500 mr-1">MUH</span>
+                <span className={`text-2xl font-bold ${muhWins ? 'text-green-400' : oppWins ? 'text-red-400' : 'text-white'}`}>{i.m}</span>
+              </div>
+              <div className="text-right">
+                <span className="text-2xl font-bold text-gray-500">{i.o}</span>
+                <span className="text-xs text-gray-500 ml-1">OPP</span>
+              </div>
+            </div>
+          </div>
+        );
+      };
+      return (
+        <div className="bg-gray-800 rounded-xl p-4 border border-gray-700">
+          <h3 className="font-semibold text-white mb-4 flex items-center gap-2"><Zap className="text-orange-500" />Quick Comparison</h3>
+          <div className="space-y-4">
+            <div>
+              <div className="text-xs text-gray-500 uppercase tracking-wider mb-2 pl-1">Per Game / Rate Stats</div>
+              <div className="grid grid-cols-3 gap-3">{perGame.map(i => <StatBox key={i.l} i={i} />)}</div>
+            </div>
+            <div>
+              <div className="text-xs text-gray-500 uppercase tracking-wider mb-2 pl-1">Season Totals</div>
+              <div className="grid grid-cols-3 gap-3">{season.map(i => <StatBox key={i.l} i={i} />)}</div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // Team Selection Modal
+    function TeamSelectModal({ open, onClose, onSelect, oppName }) {
+      if (!open) return null;
+      return (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-800 rounded-xl border border-gray-700 max-w-md w-full overflow-hidden shadow-2xl">
+            <div className="p-6 border-b border-gray-700 text-center">
+              <h2 className="text-xl font-semibold text-white">Generate Scouting Report</h2>
+              <p className="text-gray-400 mt-2 text-sm">Which team are you scouting for?</p>
+            </div>
+            <div className="p-6 space-y-3">
+              <button onClick={() => onSelect('muhlenberg')} className="w-full p-4 bg-red-800 hover:bg-red-700 text-white rounded-lg transition-colors text-left">
+                <div className="font-semibold text-lg">Muhlenberg</div>
+                <div className="text-sm text-white/70">How to beat {oppName}</div>
+              </button>
+              <button onClick={() => onSelect('opponent')} className="w-full p-4 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors text-left">
+                <div className="font-semibold text-lg">{oppName}</div>
+                <div className="text-sm text-gray-400">How to beat Muhlenberg</div>
+              </button>
+            </div>
+            <div className="px-6 pb-6">
+              <button onClick={onClose} className="w-full p-2 text-gray-500 hover:text-gray-300 transition-colors text-sm">Cancel</button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // Scouting Report Modal
+    function Modal({ open, onClose, report, loading, error, oppName, perspective }) {
+      if (!open) return null;
+      const forTeam = perspective === 'muhlenberg' ? 'Muhlenberg' : oppName;
+      const againstTeam = perspective === 'muhlenberg' ? oppName : 'Muhlenberg';
+      const headerBg = perspective === 'muhlenberg' ? 'bg-red-800' : 'bg-blue-900';
+      const accentColor = perspective === 'muhlenberg' ? 'text-red-800' : 'text-blue-900';
+      const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+
+      // Parse sections from report
+      const parseReport = (text) => {
+        if (!text) return [];
+        const sections = [];
+        let current = null;
+        for (const line of text.split('\n')) {
+          const t = line.trim();
+          if (t && t === t.toUpperCase() && t.length > 3 && !t.endsWith('.')) {
+            if (current) sections.push(current);
+            current = { title: t, content: [] };
+          } else if (current && t) {
+            current.content.push(t);
+          }
+        }
+        if (current) sections.push(current);
+        return sections;
+      };
+      const sections = report ? parseReport(report) : [];
+
+      const handlePrint = () => {
+        const printWindow = window.open('', '_blank');
+        const headerColor = perspective === 'muhlenberg' ? '#991b1b' : '#1e3a5f';
+        const accentHex = perspective === 'muhlenberg' ? '#991b1b' : '#1e3a5f';
+        printWindow.document.write(`
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <title>Scouting Report - ${forTeam} vs ${againstTeam}</title>
+            <style>
+              * { margin: 0; padding: 0; box-sizing: border-box; }
+              body { font-family: Georgia, serif; background: #fffbf5; color: #333; }
+              .header { background: ${headerColor}; color: white; padding: 24px 32px; }
+              .header-content { display: flex; justify-content: space-between; align-items: center; }
+              .team-label { font-size: 10px; text-transform: uppercase; letter-spacing: 2px; opacity: 0.7; margin-bottom: 4px; }
+              .title { font-size: 24px; font-weight: bold; }
+              .opponent { font-size: 18px; text-align: right; }
+              .date { font-size: 12px; opacity: 0.7; }
+              .confidential { background: #f5f0e6; padding: 8px 32px; font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: #8b7355; border-bottom: 1px solid #e5dcc8; }
+              .content { padding: 24px 32px; }
+              .section { margin-bottom: 20px; }
+              .section-title { font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; color: ${accentHex}; border-bottom: 1px solid #e5dcc8; padding-bottom: 4px; margin-bottom: 8px; }
+              .section-text { font-size: 13px; line-height: 1.6; }
+              .section-text p { margin-bottom: 8px; }
+              .footer { background: #f5f0e6; padding: 12px 32px; font-size: 10px; color: #8b7355; display: flex; justify-content: space-between; border-top: 1px solid #e5dcc8; }
+              @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+            </style>
+          </head>
+          <body>
+            <div class="header">
+              <div class="header-content">
+                <div>
+                  <div class="team-label">${forTeam} Baseball</div>
+                  <div class="title">SCOUTING REPORT</div>
+                </div>
+                <div>
+                  <div class="opponent">vs ${againstTeam}</div>
+                  <div class="date">${today}</div>
+                </div>
+              </div>
+            </div>
+            <div class="confidential">Confidential — ${forTeam} Team Use Only</div>
+            <div class="content">
+              ${sections.map(s => `
+                <div class="section">
+                  <div class="section-title">${s.title}</div>
+                  <div class="section-text">${s.content.map(p => `<p>${p}</p>`).join('')}</div>
+                </div>
+              `).join('')}
+            </div>
+            <div class="footer">
+              <span>Prepared for ${forTeam} Baseball</span>
+              <span>Generated ${today}</span>
+            </div>
+          </body>
+          </html>
+        `);
+        printWindow.document.close();
+        printWindow.focus();
+        setTimeout(() => printWindow.print(), 250);
+      };
+
+      return (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-800 rounded-xl border border-gray-700 max-w-3xl w-full max-h-[90vh] overflow-hidden shadow-2xl">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-4 border-b border-gray-700">
+              <div className="flex items-center gap-2"><Target className="text-orange-500" /><span className="text-lg font-semibold text-white">Scouting Report</span></div>
+              <div className="flex items-center gap-2">
+                {report && !loading && <button onClick={handlePrint} className="flex items-center gap-2 px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-gray-300 rounded-lg text-sm">🖨️ Print / PDF</button>}
+                <button onClick={onClose} className="text-gray-500 hover:text-white p-1"><X /></button>
+              </div>
+            </div>
+            {/* Content */}
+            <div className="overflow-y-auto max-h-[calc(90vh-60px)]">
+              {loading && <div className="flex items-center justify-center py-16 bg-gray-800"><Loader className="text-orange-500 animate-spin" /><span className="ml-3 text-gray-400">Generating report...</span></div>}
+              {error && <div className="p-4"><div className="bg-red-900/30 border border-red-800 rounded-lg p-4 text-red-400 flex items-start gap-2"><AlertTriangle className="mt-0.5 flex-shrink-0" /><span>{error}</span></div></div>}
+              {report && !loading && (
+                <div className="bg-amber-50 print-content">
+                  {/* Document Header */}
+                  <div className={`${headerBg} text-white px-8 py-6`}>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="text-xs uppercase tracking-widest text-white/70 mb-1">{forTeam} Baseball</div>
+                        <h1 className="text-2xl font-bold tracking-tight">SCOUTING REPORT</h1>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-xl font-semibold">vs {againstTeam}</div>
+                        <div className="text-sm text-white/70">{today}</div>
+                      </div>
+                    </div>
+                  </div>
+                  {/* Confidential Banner */}
+                  <div className="bg-amber-100 border-b border-amber-200 px-8 py-2">
+                    <div className="text-xs uppercase tracking-wider text-amber-700 font-medium">Confidential — {forTeam} Team Use Only</div>
+                  </div>
+                  {/* Report Content */}
+                  <div className="px-8 py-6 space-y-5">
+                    {sections.map((s, i) => (
+                      <div key={i}>
+                        <h2 className={`text-sm font-bold uppercase tracking-wider ${accentColor} mb-2 pb-1 border-b border-amber-200`}>{s.title}</h2>
+                        <div className="text-gray-800 text-sm leading-relaxed space-y-2">
+                          {s.content.map((p, j) => <p key={j}>{p}</p>)}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  {/* Footer */}
+                  <div className="px-8 py-4 bg-amber-100 border-t border-amber-200">
+                    <div className="flex items-center justify-between text-xs text-amber-700">
+                      <span>Prepared for {forTeam} Baseball</span>
+                      <span>Generated {today}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ============================================================================
+    // APP
+    // ============================================================================
+    function App() {
+      const [opp, setOpp] = useState('jhu');
+      const [tab, setTab] = useState('comparison');
+      const [fullStatsTeam, setFullStatsTeam] = useState('muh');
+      const [report, setReport] = useState(null);
+      const [loading, setLoading] = useState(false);
+      const [error, setError] = useState(null);
+      const [modal, setModal] = useState(false);
+      const [teamSelectModal, setTeamSelectModal] = useState(false);
+      const [perspective, setPerspective] = useState(null);
+
+      const muh = STATS.muh, oppStats = STATS[opp], oppTeam = TEAMS[opp];
+      const muhP = PLAYERS.muh, oppP = PLAYERS[opp] || { batters: [], pitchers: [] };
+
+      const battingData = [
+        { label: 'AVG', muh: muh.batting.avg, opp: oppStats.batting.avg, format: v => fmt(v) },
+        { label: 'OBP', muh: muh.batting.obp, opp: oppStats.batting.obp, format: v => fmt(v) },
+        { label: 'SLG', muh: muh.batting.slg, opp: oppStats.batting.slg, format: v => fmt(v) }
+      ];
+      const pitchingData = [
+        { label: 'ERA', muh: muh.pitching.era, opp: oppStats.pitching.era, format: v => fmt(v,2), lowerIsBetter: true },
+        { label: 'WHIP', muh: muh.pitching.whip, opp: oppStats.pitching.whip, format: v => fmt(v,2), lowerIsBetter: true }
+      ];
+
+      const doReport = () => {
+        setTeamSelectModal(true);
+      };
+
+      const handleTeamSelect = async (team) => {
+        setPerspective(team);
+        setTeamSelectModal(false);
+        setLoading(true); setError(null); setReport(null); setModal(true);
+        try { setReport(await genReport(muh, oppStats, oppTeam.name, team)); }
+        catch (e) { setError(e.message); }
+        finally { setLoading(false); }
+      };
+
+      const tabs = [{ id: 'comparison', label: 'Head-to-Head', I: TrendingUp }, { id: 'muhlenberg', label: 'Muhlenberg', I: Users }, { id: 'opponent', label: 'Scout Opponent', I: Target }, { id: 'fullstats', label: 'Full Stats', I: Database }];
+
+      return (
+        <div className="min-h-screen bg-gray-900 text-white">
+          <header className="bg-gray-800 border-b border-gray-700 sticky top-0 z-40">
+            <div className="max-w-6xl mx-auto px-4 py-4">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <span className="text-3xl">⚾</span>
+                  <div>
+                    <h1 className="text-xl font-bold">Centennial Conference</h1>
+                    <p className="text-sm text-gray-500">Baseball Scouting Dashboard</p>
+                  </div>
+                  <div className="ml-4 bg-orange-500/20 text-orange-400 px-3 py-1 rounded-full text-xs font-semibold">2025 Season</div>
+                </div>
+                {/* API key now handled by backend */}
+              </div>
+              <div className="flex gap-1 mt-4">
+                {tabs.map(t => <button key={t.id} onClick={() => setTab(t.id)} className={`flex items-center gap-2 px-4 py-2 rounded-t-lg font-medium transition-colors ${tab === t.id ? 'bg-gray-900 text-orange-500 border-t border-x border-gray-700' : 'text-gray-500 hover:text-gray-300'}`}><t.I className="w-4 h-4" />{t.label}</button>)}
+              </div>
+            </div>
+          </header>
+
+          <main className="max-w-6xl mx-auto px-4 py-6">
+            {tab === 'comparison' && (
+              <div className="space-y-6">
+                <div className="flex flex-col md:flex-row items-center justify-center gap-6 py-4">
+                  <div className="text-center">
+                    <div className="w-16 h-16 rounded-full bg-red-800 flex items-center justify-center text-2xl mb-2 mx-auto">🔴</div>
+                    <h2 className="text-xl font-bold">Muhlenberg</h2>
+                    <p className="text-sm text-gray-500">{muh.pitching.wins}-{muh.pitching.losses}</p>
+                  </div>
+                  <div className="text-3xl font-bold text-gray-600">VS</div>
+                  <div className="text-center">
+                    <div className="w-16 h-16 rounded-full flex items-center justify-center text-2xl mb-2 mx-auto" style={{backgroundColor: oppTeam.color}}>⚾</div>
+                    <TeamSelect value={opp} onChange={setOpp} />
+                    <p className="text-sm text-gray-500 mt-1">{oppStats.pitching.wins}-{oppStats.pitching.losses}</p>
+                  </div>
+                </div>
+                <div className="grid md:grid-cols-2 gap-6">
+                  <BarChart data={battingData} title="Batting Comparison" oppName={oppTeam.name} />
+                  <BarChart data={pitchingData} title="Pitching Comparison" oppName={oppTeam.name} />
+                </div>
+                <QuickStats muh={muh} opp={oppStats} />
+              </div>
+            )}
+
+            {tab === 'muhlenberg' && (
+              <div className="space-y-6">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="w-12 h-12 rounded-full bg-red-800 flex items-center justify-center text-xl">🔴</div>
+                  <div><h2 className="text-2xl font-bold">Muhlenberg Mules</h2><p className="text-gray-500">2025 Season • {muh.pitching.wins}-{muh.pitching.losses}</p></div>
+                </div>
+                <div className="grid md:grid-cols-2 gap-6">
+                  <StatCard title="Team Batting" icon={TrendingUp} stats={muh.batting} type="batting" />
+                  <StatCard title="Team Pitching" icon={Target} stats={muh.pitching} type="pitching" />
+                </div>
+                <h3 className="text-lg font-semibold flex items-center gap-2 mt-6"><Users className="text-orange-500" />Top Hitters<InfoTooltip text="Minimum 30 at-bats required for qualification" /></h3>
+                <PlayerTable players={muhP.batters} type="batters" />
+                <h3 className="text-lg font-semibold flex items-center gap-2 mt-6"><Target className="text-orange-500" />Pitching Staff<InfoTooltip text="Minimum 10 innings pitched required for qualification" /></h3>
+                <PlayerTable players={muhP.pitchers} type="pitchers" />
+              </div>
+            )}
+
+            {tab === 'opponent' && (
+              <div className="space-y-6">
+                <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-6">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-full flex items-center justify-center text-xl" style={{backgroundColor: oppTeam.color}}>⚾</div>
+                    <div>
+                      <div className="flex items-center gap-3"><h2 className="text-2xl font-bold">{oppTeam.name}</h2><TeamSelect value={opp} onChange={setOpp} /></div>
+                      <p className="text-gray-500">{oppTeam.mascot} • {oppStats.pitching.wins}-{oppStats.pitching.losses}</p>
+                    </div>
+                  </div>
+                  <button onClick={doReport} className="flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors"><Zap />Generate AI Scouting Report</button>
+                </div>
+                <div className="grid md:grid-cols-2 gap-6">
+                  <StatCard title="Team Batting" icon={TrendingUp} stats={oppStats.batting} type="batting" />
+                  <StatCard title="Team Pitching" icon={Target} stats={oppStats.pitching} type="pitching" />
+                </div>
+                <h3 className="text-lg font-semibold flex items-center gap-2 mt-6"><Users className="text-orange-500" />Top Hitters<InfoTooltip text="Minimum 30 at-bats required for qualification" /></h3>
+                <PlayerTable players={oppP.batters} type="batters" />
+                <h3 className="text-lg font-semibold flex items-center gap-2 mt-6"><Target className="text-orange-500" />Pitching Staff<InfoTooltip text="Minimum 10 innings pitched required for qualification" /></h3>
+                <PlayerTable players={oppP.pitchers} type="pitchers" />
+              </div>
+            )}
+
+            {tab === 'fullstats' && (
+              <div className="space-y-6">
+                <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-6">
+                  <div className="flex items-center gap-3">
+                    <Database className="text-orange-500 w-8 h-8" />
+                    <div>
+                      <h2 className="text-2xl font-bold">Full Team Statistics</h2>
+                      <p className="text-gray-500">Complete stats for all qualified players</p>
+                    </div>
+                  </div>
+                  <AllTeamSelect value={fullStatsTeam} onChange={setFullStatsTeam} />
+                </div>
+
+                <div className="bg-gray-800/50 border border-gray-700 rounded-lg px-4 py-2 inline-flex items-center gap-2 text-sm text-gray-400">
+                  <span>Showing players with</span>
+                  <span className="text-orange-400 font-semibold">{MIN_AB}+ AB</span>
+                  <span>(batters) /</span>
+                  <span className="text-orange-400 font-semibold">{MIN_IP}+ IP</span>
+                  <span>(pitchers)</span>
+                  <InfoTooltip text="Players below these thresholds are excluded to ensure meaningful sample sizes" />
+                </div>
+
+                <h3 className="text-lg font-semibold flex items-center gap-2 mt-6"><TrendingUp className="text-orange-500" />Batting Statistics - {TEAMS[fullStatsTeam].name}</h3>
+                <FullStatsTable players={PLAYERS[fullStatsTeam]?.batters || []} type="batters" />
+
+                <h3 className="text-lg font-semibold flex items-center gap-2 mt-6"><Target className="text-orange-500" />Pitching Statistics - {TEAMS[fullStatsTeam].name}</h3>
+                <FullStatsTable players={PLAYERS[fullStatsTeam]?.pitchers || []} type="pitchers" />
+              </div>
+            )}
+          </main>
+
+          <footer className="bg-gray-800 border-t border-gray-700 mt-12 py-6">
+            <div className="max-w-6xl mx-auto px-4">
+              <details className="mb-4">
+                <summary className="text-sm text-gray-400 cursor-pointer hover:text-gray-300">📊 How to update stats for 2026 season</summary>
+                <div className="mt-3 p-4 bg-gray-700/50 rounded-lg text-sm text-gray-400 space-y-2">
+                  <p><strong className="text-gray-300">When the 2026 season starts:</strong></p>
+                  <ol className="list-decimal list-inside space-y-1 pl-2">
+                    <li>Open this HTML file in a text editor</li>
+                    <li>Find the <code className="bg-gray-600 px-1 rounded">STATS</code> and <code className="bg-gray-600 px-1 rounded">PLAYERS</code> objects near the top</li>
+                    <li>Update the numbers from <a href="https://centennial.org/sports/baseball/stats" target="_blank" className="text-orange-400 hover:underline">centennial.org/sports/baseball/stats</a></li>
+                    <li>Change the "2025 Season" badge in the header to "2026 Season"</li>
+                  </ol>
+                  <p className="mt-2 text-xs">Tip: The Centennial Conference updates stats throughout the season. Check back before each series for current numbers!</p>
+                </div>
+              </details>
+              <div className="text-center text-sm text-gray-500">
+                <p>Data from Centennial Conference • 2025 Season</p>
+                <p className="mt-1">Built for Muhlenberg Baseball ⚾</p>
+              </div>
+            </div>
+          </footer>
+
+          <TeamSelectModal open={teamSelectModal} onClose={() => setTeamSelectModal(false)} onSelect={handleTeamSelect} oppName={oppTeam.name} />
+          <Modal open={modal} onClose={() => setModal(false)} report={report} loading={loading} error={error} oppName={oppTeam.name} perspective={perspective} />
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>

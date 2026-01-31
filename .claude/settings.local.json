@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(start \"\" \"C:\\\\Users\\\\jlevi\\\\Documents\\\\Claude Code\\\\Ian Demo\\\\index.html\")",
+      "Bash(timeout:*)",
+      "Bash(start \"\" \"http://localhost:3000/index.html\")",
+      "Bash(ping:*)",
+      "Bash(curl:*)",
+      "Bash(where:*)",
+      "Bash(python scrape_stats.py:*)",
+      "Bash(python:*)",
+      "Bash(dir /s \"C:\\\\Users\\\\jlevi\\\\Documents\\\\Claude Code\\\\Ian Demo\")",
+      "Bash(dir \"C:\\\\Users\\\\jlevi\\\\Documents\\\\Claude Code\\\\Ian Demo\")",
+      "Bash(dir:*)"
+    ]
+  }
+}
