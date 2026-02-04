@@ -63,16 +63,16 @@
     // DATA
     // ============================================================================
     const TEAMS = {
-      muh: { code: 'muh', name: 'Muhlenberg', mascot: 'Mules', color: '#991B1B', isHome: true },
-      jhu: { code: 'jhu', name: 'Johns Hopkins', mascot: 'Blue Jays', color: '#1E3A8A' },
-      get: { code: 'get', name: 'Gettysburg', mascot: 'Bullets', color: '#EA580C' },
-      hav: { code: 'hav', name: 'Haverford', mascot: 'Fords', color: '#991B1B' },
-      mcd: { code: 'mcd', name: 'McDaniel', mascot: 'Green Terror', color: '#166534' },
-      wac: { code: 'wac', name: 'Washington College', mascot: 'Shoremen', color: '#7F1D1D' },
-      fandm: { code: 'fandm', name: 'Franklin & Marshall', mascot: 'Diplomats', color: '#1E3A8A' },
-      swa: { code: 'swa', name: 'Swarthmore', mascot: 'Garnet', color: '#7F1D1D' },
-      urs: { code: 'urs', name: 'Ursinus', mascot: 'Bears', color: '#B91C1C' },
-      dick: { code: 'dick', name: 'Dickinson', mascot: 'Red Devils', color: '#B91C1C' }
+      muh: { code: 'muh', name: 'Muhlenberg', mascot: 'Mules', color: '#991B1B', isHome: true, logo: 'https://dxbhsrqyrr690.cloudfront.net/sidearm.nextgen.sites/muhlenberg.sidearmsports.com/images/responsive_2024/logo_main.png' },
+      jhu: { code: 'jhu', name: 'Johns Hopkins', mascot: 'Blue Jays', color: '#1E3A8A', logo: 'https://dxbhsrqyrr690.cloudfront.net/sidearm.nextgen.sites/hopkinssports.com/images/responsive_2025/logos/logo_main.svg' },
+      get: { code: 'get', name: 'Gettysburg', mascot: 'Bullets', color: '#EA580C', logo: 'https://dxbhsrqyrr690.cloudfront.net/sidearm.nextgen.sites/gettysburgsports.com/images/responsive_2024/logo_main.svg' },
+      hav: { code: 'hav', name: 'Haverford', mascot: 'Fords', color: '#991B1B', logo: 'https://dxbhsrqyrr690.cloudfront.net/sidearm.nextgen.sites/haverfordathletics.com/images/responsive_2025/header-flourish_logo_lettermark.svg' },
+      mcd: { code: 'mcd', name: 'McDaniel', mascot: 'Green Terror', color: '#166534', logo: 'https://dxbhsrqyrr690.cloudfront.net/sidearm.nextgen.sites/mcdanielathletics.com/images/responsive_2022/logo_main-1.svg' },
+      wac: { code: 'wac', name: 'Washington College', mascot: 'Shoremen', color: '#7F1D1D', logo: 'https://dxbhsrqyrr690.cloudfront.net/sidearm.nextgen.sites/washingtoncollegesports.com/images/responsive_2022/svgs/on-light-theme.svg' },
+      fandm: { code: 'fandm', name: 'Franklin & Marshall', mascot: 'Diplomats', color: '#1E3A8A', logo: 'https://dxbhsrqyrr690.cloudfront.net/sidearm.nextgen.sites/fandm.sidearmsports.com/images/responsive_2023/logo_main.svg' },
+      swa: { code: 'swa', name: 'Swarthmore', mascot: 'Garnet', color: '#7F1D1D', logo: 'https://dxbhsrqyrr690.cloudfront.net/sidearm.nextgen.sites/swarthmoreathletics.com/images/responsive_2023/logo_main.svg' },
+      urs: { code: 'urs', name: 'Ursinus', mascot: 'Bears', color: '#B91C1C', logo: 'https://dxbhsrqyrr690.cloudfront.net/sidearm.nextgen.sites/ursinuscollege.sidearmsports.com/responsive_2022/images/svgs/ursinuscollege_logo.svg' },
+      dick: { code: 'dick', name: 'Dickinson', mascot: 'Red Devils', color: '#B91C1C', logo: 'https://dxbhsrqyrr690.cloudfront.net/sidearm.nextgen.sites/dickinsonathletics.com/images/responsive_2025/logo_main.svg' }
     };
 
     const STATS = {
@@ -436,6 +436,22 @@ Tone: Professional, analytical, matter-of-fact. Data-driven statements, no color
     // ============================================================================
     // COMPONENTS
     // ============================================================================
+
+    // Team Logo component with fallback to colored circle
+    function TeamLogo({ team, size = 'md' }) {
+      const sizeClasses = { sm: 'w-8 h-8', md: 'w-12 h-12', lg: 'w-16 h-16' };
+      const textSizes = { sm: 'text-sm', md: 'text-xl', lg: 'text-2xl' };
+      const [imgError, setImgError] = React.useState(false);
+      return (
+        <div className={`${sizeClasses[size]} rounded-full overflow-hidden flex items-center justify-center`} style={{ backgroundColor: imgError ? team.color : 'transparent' }}>
+          {team.logo && !imgError ? (
+            <img src={team.logo} alt={team.name} className="w-full h-full object-cover" onError={() => setImgError(true)} />
+          ) : (
+            <div className={`w-full h-full rounded-full flex items-center justify-center ${textSizes[size]}`} style={{ backgroundColor: team.color }}>⚾</div>
+          )}
+        </div>
+      );
+    }
 
     // CSS Bar Chart with winner indicator
     function BarChart({ data, title, oppName, lowerIsBetter = false }) {
@@ -939,13 +955,13 @@ Tone: Professional, analytical, matter-of-fact. Data-driven statements, no color
               <div className="space-y-6">
                 <div className="flex flex-col md:flex-row items-center justify-center gap-6 py-4">
                   <div className="text-center">
-                    <div className="w-16 h-16 rounded-full bg-red-800 flex items-center justify-center text-2xl mb-2 mx-auto">🔴</div>
+                    <div className="mb-2 mx-auto"><TeamLogo team={TEAMS.muh} size="lg" /></div>
                     <h2 className="text-xl font-bold">Muhlenberg</h2>
                     <p className="text-sm text-gray-500">{muh.pitching.wins}-{muh.pitching.losses}</p>
                   </div>
                   <div className="text-3xl font-bold text-gray-600">VS</div>
                   <div className="text-center">
-                    <div className="w-16 h-16 rounded-full flex items-center justify-center text-2xl mb-2 mx-auto" style={{backgroundColor: oppTeam.color}}>⚾</div>
+                    <div className="mb-2 mx-auto"><TeamLogo team={oppTeam} size="lg" /></div>
                     <TeamSelect value={opp} onChange={setOpp} />
                     <p className="text-sm text-gray-500 mt-1">{oppStats.pitching.wins}-{oppStats.pitching.losses}</p>
                   </div>
@@ -961,7 +977,7 @@ Tone: Professional, analytical, matter-of-fact. Data-driven statements, no color
             {tab === 'muhlenberg' && (
               <div className="space-y-6">
                 <div className="flex items-center gap-3 mb-6">
-                  <div className="w-12 h-12 rounded-full bg-red-800 flex items-center justify-center text-xl">🔴</div>
+                  <TeamLogo team={TEAMS.muh} size="md" />
                   <div><h2 className="text-2xl font-bold">Muhlenberg Mules</h2><p className="text-gray-500">2025 Season • {muh.pitching.wins}-{muh.pitching.losses}</p></div>
                 </div>
                 <div className="grid md:grid-cols-2 gap-6">
@@ -979,7 +995,7 @@ Tone: Professional, analytical, matter-of-fact. Data-driven statements, no color
               <div className="space-y-6">
                 <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-6">
                   <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-full flex items-center justify-center text-xl" style={{backgroundColor: oppTeam.color}}>⚾</div>
+                    <TeamLogo team={oppTeam} size="md" />
                     <div>
                       <div className="flex items-center gap-3"><h2 className="text-2xl font-bold">{oppTeam.name}</h2><TeamSelect value={opp} onChange={setOpp} /></div>
                       <p className="text-gray-500">{oppTeam.mascot} • {oppStats.pitching.wins}-{oppStats.pitching.losses}</p>
