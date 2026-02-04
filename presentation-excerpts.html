@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>How I Built This - Chat Excerpts</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #e8e8e8;
+            min-height: 100vh;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 60px;
+            padding-bottom: 40px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+
+        header h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 10px;
+            background: linear-gradient(90deg, #c41e3a, #ff6b6b);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        header p {
+            font-size: 1.2rem;
+            color: #888;
+        }
+
+        .section {
+            margin-bottom: 60px;
+            scroll-margin-top: 20px;
+        }
+
+        .section-number {
+            display: inline-block;
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, #c41e3a, #8b0000);
+            border-radius: 50%;
+            text-align: center;
+            line-height: 40px;
+            font-weight: bold;
+            font-size: 1.1rem;
+            margin-bottom: 15px;
+        }
+
+        .section h2 {
+            font-size: 1.6rem;
+            margin-bottom: 20px;
+            color: #fff;
+        }
+
+        .prompt-box {
+            background: rgba(255,255,255,0.05);
+            border-left: 4px solid #c41e3a;
+            border-radius: 0 12px 12px 0;
+            padding: 25px 30px;
+            margin-bottom: 20px;
+            font-size: 1.15rem;
+            line-height: 1.7;
+        }
+
+        .prompt-box::before {
+            content: "What I wrote:";
+            display: block;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #c41e3a;
+            margin-bottom: 12px;
+            font-weight: 600;
+        }
+
+        .prompt-text {
+            color: #f0f0f0;
+            font-style: italic;
+        }
+
+        .summary-box {
+            background: rgba(196, 30, 58, 0.1);
+            border-radius: 12px;
+            padding: 20px 25px;
+            display: flex;
+            align-items: flex-start;
+            gap: 15px;
+        }
+
+        .summary-box::before {
+            content: "→";
+            font-size: 1.5rem;
+            color: #c41e3a;
+            flex-shrink: 0;
+        }
+
+        .summary-text {
+            color: #ccc;
+            font-size: 1.05rem;
+        }
+
+        .divider {
+            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
+            margin: 50px 0;
+        }
+
+        .takeaway {
+            text-align: center;
+            padding: 40px;
+            background: rgba(255,255,255,0.03);
+            border-radius: 16px;
+            margin-top: 40px;
+        }
+
+        .takeaway h3 {
+            font-size: 1.4rem;
+            margin-bottom: 15px;
+            color: #c41e3a;
+        }
+
+        .takeaway p {
+            font-size: 1.1rem;
+            color: #aaa;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        /* Smooth scrolling */
+        html {
+            scroll-behavior: smooth;
+        }
+
+        /* Mobile adjustments */
+        @media (max-width: 600px) {
+            header h1 {
+                font-size: 1.8rem;
+            }
+            .prompt-box {
+                padding: 20px;
+                font-size: 1rem;
+            }
+            .section h2 {
+                font-size: 1.3rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>How I Built the Dashboard</h1>
+            <p>The actual prompts I used — no coding required</p>
+        </header>
+
+        <!-- Section 1: The Big Ask -->
+        <div class="section">
+            <div class="section-number">1</div>
+            <h2>The Big Ask</h2>
+            <div class="prompt-box">
+                <div class="prompt-text">
+                    "I want to build a Centennial Conference Baseball Scouting Dashboard as a React web app. This is for a D3 college baseball player at Muhlenberg College. His 2026 season starts February 21.<br><br>
+                    The app lets the user select an upcoming opponent from the Centennial Conference and generates a full scouting report with stats and AI analysis.<br><br>
+                    Scrape the stats from the conference website. Store it as JSON. Build a dashboard with head-to-head comparisons, charts, player tables, and an AI scouting report button..."
+                </div>
+            </div>
+            <div class="summary-box">
+                <div class="summary-text">
+                    From this one message, Claude built the entire scraper (to grab stats from 10 team websites) and the full dashboard structure. I just described what I wanted it to <em>do</em>.
+                </div>
+            </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <!-- Section 2: Testing & Feedback -->
+        <div class="section">
+            <div class="section-number">2</div>
+            <h2>Testing & Giving Feedback</h2>
+            <div class="prompt-box">
+                <div class="prompt-text">
+                    "Some of the top hitters have like a really small sample size of at bats. And so I think there should be like a cut off for at bats so that there's a significant enough sample size for them to be considered a top hitter.<br><br>
+                    Also if I sort by stolen bases, it's only going to sort out of the 5 that are originally there. It should pull from ALL qualified players on the team."
+                </div>
+            </div>
+            <div class="summary-box">
+                <div class="summary-text">
+                    I noticed a problem while testing and just described what was wrong. I didn't know <em>how</em> to fix it — I just said what I wanted to be different. Claude handled the logic.
+                </div>
+            </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <!-- Section 3: Visual Feedback -->
+        <div class="section">
+            <div class="section-number">3</div>
+            <h2>Visual Feedback</h2>
+            <div class="prompt-box">
+                <div class="prompt-text">
+                    "For the per game stats it should be more obvious which team has the edge. I don't like the checkmark either. Remember this is for Muhlenberg."
+                </div>
+            </div>
+            <div class="summary-box">
+                <div class="summary-text">
+                    I just said what I didn't like. No need to know CSS or design — just "I don't like the checkmark" and "make it more obvious." Claude redesigned it.
+                </div>
+            </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <!-- Section 4: When Things Break -->
+        <div class="section">
+            <div class="section-number">4</div>
+            <h2>When Things Break</h2>
+            <div class="prompt-box">
+                <div class="prompt-text">
+                    "I tried to generate a scouting report and got this error: [pasted error message]"
+                </div>
+            </div>
+            <div class="summary-box">
+                <div class="summary-text">
+                    Things broke constantly. I didn't need to understand why — I just pasted the error and Claude figured out what went wrong and fixed it.
+                </div>
+            </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <!-- Section 5: Asking for Help -->
+        <div class="section">
+            <div class="section-number">5</div>
+            <h2>Asking for Help</h2>
+            <div class="prompt-box">
+                <div class="prompt-text">
+                    "Can you write explicit instructions? I'm not that technical."<br><br>
+                    "Wait please include how you open the project folder."<br><br>
+                    "Wait how do I edit the .env file?"
+                </div>
+            </div>
+            <div class="summary-box">
+                <div class="summary-text">
+                    When I didn't understand something, I just asked for simpler instructions. You don't need to pretend you know things — just ask.
+                </div>
+            </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <!-- Section 6: The Meta Moment -->
+        <div class="section">
+            <div class="section-number">6</div>
+            <h2>The Meta Moment</h2>
+            <div class="prompt-box">
+                <div class="prompt-text">
+                    "Any technical jargon needs to be dumbed down as much as possible because my cousin is a freshman in college. He's not the most cerebral guy. He doesn't have a lot of programming background at all — none.<br><br>
+                    I don't have the programming background myself, so I want to highlight kind of the process..."
+                </div>
+            </div>
+            <div class="summary-box">
+                <div class="summary-text">
+                    Claude adapts to any audience. I told it who you are and it adjusted how it explained things. That's why the guide is written the way it is.
+                </div>
+            </div>
+        </div>
+
+        <div class="takeaway">
+            <h3>The Point</h3>
+            <p>I built this entire dashboard — scraping stats from 10 teams, charts, tables, AI scouting reports, print functionality — and I don't know how any of the code actually works. I just kept describing what I wanted until it existed.</p>
+        </div>
+    </div>
+</body>
+</html>
