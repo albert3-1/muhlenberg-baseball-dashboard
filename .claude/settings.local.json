@@ -11,7 +11,21 @@
       "Bash(python:*)",
       "Bash(dir /s \"C:\\\\Users\\\\jlevi\\\\Documents\\\\Claude Code\\\\Ian Demo\")",
       "Bash(dir \"C:\\\\Users\\\\jlevi\\\\Documents\\\\Claude Code\\\\Ian Demo\")",
-      "Bash(dir:*)"
+      "Bash(dir:*)",
+      "Bash(wc:*)",
+      "Bash(findstr:*)",
+      "Bash(powershell -Command \"Get-Content ''89eae57b-6fd6-4648-953d-0330969f016a.jsonl'' | ForEach-Object { try { $j = $_| ConvertFrom-Json; if \\($j.type -eq ''user''\\) { $j.message.content } } catch {} }\")",
+      "Bash(powershell -Command \"Get-Content ''ab02ced4-caf6-4c6c-ad2c-07b7b817f79e.jsonl'' | ForEach-Object { try { $j = $_| ConvertFrom-Json; if \\($j.type -eq ''user''\\) { $j.message.content } } catch {} }\")",
+      "Bash(powershell -Command \"Get-Content ''b7bb5c4c-81a4-4bde-95a2-6c5bf8b0f09c.jsonl'' | ForEach-Object { try { $j = $_| ConvertFrom-Json; if \\($j.type -eq ''user''\\) { $j.message.content } } catch {} }\")",
+      "Bash(powershell -Command \"$lines = Get-Content ''89eae57b-6fd6-4648-953d-0330969f016a.jsonl''; $lines[0..5] | ForEach-Object { $_Substring\\(0, [Math]::Min\\(2000, $_Length\\)\\) }\")",
+      "Bash(powershell -Command:*)",
+      "Bash(powershell -File - <<'SCRIPT'\n$lines = Get-Content 'ab02ced4-caf6-4c6c-ad2c-07b7b817f79e.jsonl'\n$count = 0\nforeach \\($line in $lines\\) {\n    if \\($line -match '\"type\":\"user\"' -and $line -match '\"content\":\"\\([^\"]+\\)\"'\\) {\n        $msg = $matches[1]\n        if \\($msg.Length -gt 50 -and $msg -notmatch 'tool_result'\\) {\n            Write-Host \"=== MESSAGE $count ===\"\n            Write-Host $msg.Substring\\(0, [Math]::Min\\(500, $msg.Length\\)\\)\n            Write-Host \"\"\n            $count++\n            if \\($count -ge 20\\) { break }\n        }\n    }\n}\nSCRIPT)",
+      "Bash(node -e:*)",
+      "Bash(start \"\" \"C:\\\\Users\\\\jlevi\\\\Documents\\\\Claude Code\\\\Ian Demo\\\\presentation-excerpts.html\")",
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nAdded presentation excerpts page for Ian demo\n\nStyled HTML page showing the actual prompts used to build the dashboard - for walking through the vibe coding process during the presentation.\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git push)",
+      "Bash(git commit:*)"
     ]
   }
 }
