@@ -2,14 +2,22 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 import os
 import requests
-from dotenv import dotenv_values
 
-# Load .env file directly (more reliable on Windows)
-config = dotenv_values('.env')
-ANTHROPIC_API_KEY = config.get('ANTHROPIC_API_KEY')
+# Use environment variables (works on Render and locally)
+# Locally, you can still use a .env file with python-dotenv
+try:
+    from dotenv import dotenv_values
+    config = dotenv_values('.env')
+    ANTHROPIC_API_KEY = config.get('ANTHROPIC_API_KEY') or os.environ.get('ANTHROPIC_API_KEY')
+except ImportError:
+    ANTHROPIC_API_KEY = os.environ.get('ANTHROPIC_API_KEY')
 
 app = Flask(__name__)
 CORS(app)
+
+@app.route('/health', methods=['GET'])
+def health():
+    return jsonify({'status': 'ok'})
 
 @app.route('/api/scout-report', methods=['POST'])
 def scout_report():
@@ -48,6 +56,7 @@ def scout_report():
 
 if __name__ == '__main__':
     if not ANTHROPIC_API_KEY:
-        print("WARNING: ANTHROPIC_API_KEY not set in .env file")
-    print("Starting server on http://localhost:5000")
-    app.run(debug=True, port=5000)
+        print("WARNING: ANTHROPIC_API_KEY not set")
+    port = int(os.environ.get('PORT', 5000))
+    print(f"Starting server on http://localhost:{port}")
+    app.run(debug=True, port=port)

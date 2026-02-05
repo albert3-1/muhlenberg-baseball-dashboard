@@ -391,8 +391,9 @@
     const cmp = (m, o, lower=false) => lower ? (m < o ? 'better' : m > o ? 'worse' : 'eq') : (m > o ? 'better' : m < o ? 'worse' : 'eq');
 
     // ============================================================================
-    // API
+    // API — Change this URL after deploying to Render
     // ============================================================================
+    const API_URL = 'https://muhlenberg-baseball-dashboard.onrender.com';
     async function genReport(muh, opp, oppName, perspective) {
       const isForMuh = perspective === 'muhlenberg';
       const forTeam = isForMuh ? 'Muhlenberg' : oppName;
@@ -423,11 +424,16 @@ GAME PLAN - Tactical recommendations for ${forTeam}
 
 Tone: Professional, analytical, matter-of-fact. Data-driven statements, no colorful commentary.`;
 
-      const res = await fetch('http://localhost:5000/api/scout-report', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt })
-      });
+      let res;
+      try {
+        res = await fetch(`${API_URL}/api/scout-report`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ prompt })
+        });
+      } catch (e) {
+        throw new Error('Could not connect to the server. Start it by running: python server.py');
+      }
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'API error');
       return data.report;
